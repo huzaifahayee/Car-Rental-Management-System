@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EMPLOYEE
+  CUSTOMER
+}
+
+enum Transmission {
+  MANUAL
+  AUTOMATIC
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  BOOKED
+  MAINTENANCE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  fullName     String
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         Role
+  createdAt    DateTime @default(now())
+
+  bookings     Booking[]
+}
+
+model VehiclePackage {
+  id            Int          @id @default(autoincrement())
+  category      String
+  transmission  Transmission
+  hasAC         Boolean
+  driverOption  Boolean
+  pricePerDay   Int   // stored in paisa (e.g. 500000 = Rs. 5000.00)
+  pickupCity    String
+  dropoffCity   String
+  status        VehicleStatus @default(AVAILABLE)
+  createdAt     DateTime     @default(now())
+
+  bookings      Booking[]
+}
+
+model Booking {
+  id               Int           @id @default(autoincrement())
+  status           BookingStatus @default(PENDING)
+  pickupDateTime   DateTime
+  returnDateTime   DateTime
+  paymentReference String?
+  createdAt        DateTime      @default(now())
+
+  customerId       Int
+  customer         User          @relation(fields: [customerId], references: [id])
+
+  vehiclePackageId Int
+  vehiclePackage   VehiclePackage @relation(fields: [vehiclePackageId], references: [id])
+}
+
+model Settings {
+  id           Int    @id @default(autoincrement())
+  agencyName   String
+  contactEmail String
+  contactPhone String?
+  themePalette String @default("default")
+}
