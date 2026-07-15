@@ -1,6 +1,12 @@
 // Frontend/src/App.jsx (temporary — will be replaced once routing is wired)
-import SearchResults from './pages/SearchResults'
+import { BrowserRouter } from 'react-router-dom'
+import Home from './pages/Home'
+import Login from './pages/Login'
 
 export default function App() {
-  return <SearchResults />
+  return (
+    <BrowserRouter>
+      <Login />
+    </BrowserRouter>
+  )
 }
