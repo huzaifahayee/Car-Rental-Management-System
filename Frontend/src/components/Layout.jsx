@@ -1,5 +1,5 @@
 // Frontend/src/components/Layout.jsx
-import { Outlet, Link, useLocation } from 'react-router'
+import { Outlet, Link, useLocation } from 'react-router-dom'
 
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
 
