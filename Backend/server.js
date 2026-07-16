@@ -4,6 +4,7 @@ const tenantResolver = require("./middleware/tenantResolver")
 const authRoutes = require("./routes/auth")
 const settingsRoutes = require("./routes/settings")
 const vehicleRoutes = require("./routes/vehicles")
+const bookingRoutes = require("./routes/bookings")
 
 const app = express()
 
@@ -13,6 +14,7 @@ app.use(tenantResolver)
 app.use("/auth", authRoutes)
 app.use("/settings", settingsRoutes)
 app.use("/vehicles", vehicleRoutes)
+app.use("/bookings", bookingRoutes)
 
 async function startServer() {
   try {
