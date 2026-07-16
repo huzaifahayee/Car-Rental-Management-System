@@ -2,6 +2,7 @@ require("dotenv").config()
 const express = require("express")
 const tenantResolver = require("./middleware/tenantResolver")
 const authRoutes = require("./routes/auth")
+const settingsRoutes = require("./routes/settings")
 
 const app = express()
 
@@ -9,6 +10,7 @@ app.use(express.json())
 app.use(tenantResolver)
 
 app.use("/auth", authRoutes)
+app.use("/settings", settingsRoutes)
 
 async function startServer() {
   try {
