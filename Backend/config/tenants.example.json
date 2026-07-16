@@ -1,0 +1,6 @@
+{
+  "default": {
+    "clientName": "Demo Agency",
+    "databaseUrl": "postgresql://USER:PASSWORD@localhost:5432/DB_NAME?schema=public"
+  }
+}
