@@ -40,3 +40,4 @@ function tenantResolver(req, res, next) {
 }
 
 module.exports = tenantResolver
+module.exports.getPrismaClientForTenant = getPrismaClientForTenant

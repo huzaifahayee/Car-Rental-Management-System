@@ -21,6 +21,19 @@ app.get("/test-db", async (req, res) => {
   }
 })
 
-app.listen(5000, () => {
-  console.log("Server is running on port 5000")
-})
+async function startServer() {
+  try {
+    const prisma = tenantResolver.getPrismaClientForTenant('default')
+    await prisma.$connect()
+    console.log('Connected to PostgreSQL successfully')
+  } catch (err) {
+    console.error('Failed to connect to PostgreSQL:', err.message)
+    process.exit(1)
+  }
+
+  app.listen(5000, () => {
+    console.log("Server is running on port 5000")
+  })
+}
+
+startServer()
