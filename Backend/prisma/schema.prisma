@@ -21,8 +21,8 @@ enum VehicleStatus {
   AVAILABLE
   BOOKED
   MAINTENANCE
+  INACTIVE
 }
-
 enum BookingStatus {
   PENDING
   CONFIRMED
