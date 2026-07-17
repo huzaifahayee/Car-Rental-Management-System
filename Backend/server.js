@@ -6,9 +6,10 @@ const settingsRoutes = require("./routes/settings")
 const vehicleRoutes = require("./routes/vehicles")
 const bookingRoutes = require("./routes/bookings")
 const dashboardRoutes = require("./routes/dashboard.js")
+const cors = require("cors")
 
 const app = express()
-
+app.use(cors({ origin: 'http://localhost:5173' }))
 app.use(express.json())
 app.use(tenantResolver)
 

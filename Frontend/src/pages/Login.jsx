@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import apiFetch from '../lib/apiClient'
+import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -7,14 +9,27 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
 
-  function handleSubmit(e) {
+  const navigate = useNavigate()
+  const { login } = useAuth()
+
+  async function handleSubmit(e) {
     e.preventDefault()
     if (!email || !password) {
       setError('Please fill in all fields.')
       return
     }
     setError('')
-    // TODO (Phase 5): call POST /auth/login, store JWT, redirect by role
+
+    try {
+      const data = await apiFetch('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      })
+      login(data.token, data.user)
+      navigate(data.user.role === 'ADMIN' || data.user.role === 'EMPLOYEE' ? '/admin' : '/')
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (

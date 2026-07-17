@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import apiFetch from '../lib/apiClient'
+import { useAuth } from '../context/AuthContext'
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
@@ -11,7 +13,10 @@ export default function Register() {
   const [agreed, setAgreed] = useState(false)
   const [error, setError] = useState('')
 
-  function handleSubmit(e) {
+  const navigate = useNavigate()
+  const { login } = useAuth()
+
+ async function handleSubmit(e) {
     e.preventDefault()
     if (!fullName || !email || !phone || !password || !confirmPassword) {
       setError('Please fill in all fields.')
@@ -26,7 +31,17 @@ export default function Register() {
       return
     }
     setError('')
-    // TODO (Phase 5): call POST /auth/register (Customer role only)
+
+    try {
+      const data = await apiFetch('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ fullName, email, phone, password }),
+      })
+      login(data.token, data.user)
+      navigate('/')
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   const inputStyle = {
