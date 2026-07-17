@@ -1,12 +1,27 @@
 async function getVehicles(req, res) {
+  const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status } = req.query
+
+  const where = {}
+
+  if (pickupCity) where.pickupCity = pickupCity
+  if (category) where.category = category
+  if (transmission) where.transmission = transmission
+  if (hasAC !== undefined) where.hasAC = hasAC === 'true'
+  if (status) where.status = status
+
+  if (minPrice || maxPrice) {
+    where.pricePerDay = {}
+    if (minPrice) where.pricePerDay.gte = Number(minPrice)
+    if (maxPrice) where.pricePerDay.lte = Number(maxPrice)
+  }
+
   try {
-    const vehicles = await req.prisma.vehiclePackage.findMany()
+    const vehicles = await req.prisma.vehiclePackage.findMany({ where })
     res.json(vehicles)
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch vehicles', details: err.message })
   }
 }
-
 async function getVehicleById(req, res) {
   try {
     const vehicle = await req.prisma.vehiclePackage.findUnique({ where: { id: Number(req.params.id) } })
