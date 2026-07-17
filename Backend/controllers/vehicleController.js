@@ -22,6 +22,7 @@ async function getVehicles(req, res) {
     res.status(500).json({ error: 'Failed to fetch vehicles', details: err.message })
   }
 }
+
 async function getVehicleById(req, res) {
   try {
     const vehicle = await req.prisma.vehiclePackage.findUnique({ where: { id: Number(req.params.id) } })
@@ -41,6 +42,11 @@ async function createVehicle(req, res) {
     const vehicle = await req.prisma.vehiclePackage.create({
       data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity },
     })
+    res.status(201).json(vehicle)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create vehicle', details: err.message })
+  }
+}
 
 async function updateVehicle(req, res) {
   const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status } = req.body
@@ -49,6 +55,11 @@ async function updateVehicle(req, res) {
       where: { id: Number(req.params.id) },
       data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status },
     })
+    res.json(vehicle)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update vehicle', details: err.message })
+  }
+}
 
 async function deleteVehicle(req, res) {
   try {
