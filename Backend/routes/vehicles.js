@@ -7,6 +7,7 @@ const {
   createVehicle,
   updateVehicle,
   deleteVehicle,
+   uploadVehicleImages,
 } = require('../controllers/vehicleController')
 
 const router = express.Router()
