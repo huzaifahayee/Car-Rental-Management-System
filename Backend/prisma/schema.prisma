@@ -45,10 +45,13 @@ model User {
 model VehiclePackage {
   id            Int          @id @default(autoincrement())
   category      String
+  make          String
+  model         String
+  seatingCapacity Int
   transmission  Transmission
   hasAC         Boolean
   driverOption  Boolean
-  pricePerDay   Int   // stored in paisa (e.g. 500000 = Rs. 5000.00)
+  pricePerDay   Int
   pickupCity    String
   dropoffCity   String
   status        VehicleStatus @default(AVAILABLE)

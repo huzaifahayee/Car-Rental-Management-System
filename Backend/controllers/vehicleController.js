@@ -33,32 +33,22 @@ async function getVehicleById(req, res) {
 }
 
 async function createVehicle(req, res) {
-  const { category, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity } = req.body
-  if (!category || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
+  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity } = req.body
+  if (!category || !make || !model || !seatingCapacity || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
     return res.status(400).json({ error: 'Missing required vehicle fields.' })
   }
   try {
     const vehicle = await req.prisma.vehiclePackage.create({
-      data: { category, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity },
+      data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity },
     })
-    res.status(201).json(vehicle)
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to create vehicle', details: err.message })
-  }
-}
 
 async function updateVehicle(req, res) {
-  const { category, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status } = req.body
+  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status } = req.body
   try {
     const vehicle = await req.prisma.vehiclePackage.update({
       where: { id: Number(req.params.id) },
-      data: { category, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status },
+      data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status },
     })
-    res.json(vehicle)
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to update vehicle', details: err.message })
-  }
-}
 
 async function deleteVehicle(req, res) {
   try {

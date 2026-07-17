@@ -1,0 +1,3 @@
+ALTER TABLE "VehiclePackage" ADD COLUMN "make" TEXT NOT NULL DEFAULT 'Unknown';
+ALTER TABLE "VehiclePackage" ADD COLUMN "model" TEXT NOT NULL DEFAULT 'Unknown';
+ALTER TABLE "VehiclePackage" ADD COLUMN "seatingCapacity" INTEGER NOT NULL DEFAULT 4;
