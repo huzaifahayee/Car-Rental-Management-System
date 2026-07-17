@@ -12,8 +12,8 @@ const router = express.Router()
 
 router.get('/', getVehicles)
 router.get('/:id', getVehicleById)
-router.post('/', authenticate, authorize('ADMIN'), createVehicle)
-router.put('/:id', authenticate, authorize('ADMIN'), updateVehicle)
+router.post('/', authenticate, authorize('ADMIN', 'EMPLOYEE'), createVehicle)
+router.put('/:id', authenticate, authorize('ADMIN', 'EMPLOYEE'), updateVehicle)
 router.delete('/:id', authenticate, authorize('ADMIN'), deleteVehicle)
 
 module.exports = router
