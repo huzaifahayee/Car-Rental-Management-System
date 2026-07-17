@@ -69,5 +69,20 @@ async function deleteVehicle(req, res) {
     res.status(500).json({ error: 'Failed to delete vehicle', details: err.message })
   }
 }
+async function uploadVehicleImages(req, res) {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: 'No images uploaded.' })
+  }
+  try {
+    const newUrls = req.files.map((file) => file.path)
+    const vehicle = await req.prisma.vehiclePackage.update({
+      where: { id: Number(req.params.id) },
+      data: { imageUrls: { push: newUrls } },
+    })
+    res.json(vehicle)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload images', details: err.message })
+  }
+}
 
-module.exports = { getVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle }
+module.exports = { getVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle, uploadVehicleImages }
