@@ -271,7 +271,7 @@ export default function Home() {
             {CITY_CONTENT.map(({ city, text }) => (
               <div key={city} style={{ borderLeft: '3px solid #00c472', paddingLeft: 20 }}>
                 <h3 style={{ fontWeight: 700, fontSize: 16, color: '#1a1a2e', marginBottom: 8 }}>{city}</h3>
-                <ScrollWords text={text} />
+                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.75 }}>{text}</p>
               </div>
             ))}
           </div>

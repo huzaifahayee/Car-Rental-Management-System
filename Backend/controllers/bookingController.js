@@ -38,7 +38,11 @@ async function createBooking(req, res) {
 async function getBookings(req, res) {
   try {
     const where = req.user.role === 'CUSTOMER' ? { customerId: req.user.userId } : {}
-    const bookings = await req.prisma.booking.findMany({ where, include: { vehiclePackage: true } })
+    const bookings = await req.prisma.booking.findMany({
+      where,
+      include: { vehiclePackage: true, customer: { select: { fullName: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+    })
     res.json(bookings)
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch bookings', details: err.message })

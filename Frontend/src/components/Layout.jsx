@@ -1,11 +1,18 @@
 // Frontend/src/components/Layout.jsx
-import { Outlet, Link, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
 
 export default function Layout() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { user, logout } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const closeMobileMenu = () => setMobileOpen(false)
+  function signOut() { logout(); closeMobileMenu(); navigate('/') }
 
   return (
     <div style={{ fontFamily: "'Inter', 'Nunito', sans-serif", background: '#f5f7fa', minHeight: '100vh' }}>
@@ -16,9 +23,7 @@ export default function Layout() {
             <span style={{ color: '#00c472', fontWeight: 600 }}>Multi-tenant car rental & hotel booking</span>
             <div className="flex gap-4 items-center">
               <button style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}>English</button>
-              <Link to="/login" style={{ background: '#00c472', color: '#fff', borderRadius: 6, padding: '4px 14px', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>
-                Login / Sign Up
-              </Link>
+              {user ? <button onClick={signOut} style={{ background: '#00c472', color: '#fff', border: 0, borderRadius: 6, padding: '4px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Logout</button> : <Link to="/login" style={{ background: '#00c472', color: '#fff', borderRadius: 6, padding: '4px 14px', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>Login / Sign Up</Link>}
             </div>
           </div>
         </div>
@@ -26,7 +31,7 @@ export default function Layout() {
 
       <header style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between py-4">
-          <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Link to="/" onClick={closeMobileMenu} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ background: '#00c472', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>G</span>
             </div>
@@ -40,13 +45,20 @@ export default function Layout() {
             <a href="#destinations" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</a>
             <a href="#how-it-works" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</a>
             <a href="#contact" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</a>
-            <Link to="/admin" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Admin</Link>
-            <Link to="/login" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Login</Link>
-            <Link to="/register" style={{ background: '#00c472', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
-              Register
-            </Link>
+            {user?.role !== 'CUSTOMER' && <Link to="/admin" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Admin</Link>}
+            {user ? <details className="user-menu"><summary>{user.fullName}</summary><div><Link to="/my-bookings">My Bookings</Link><button onClick={signOut}>Logout</button></div></details> : <><Link to="/login" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Login</Link><Link to="/register" style={{ background: '#00c472', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Register</Link></>}
           </nav>
+          <button className="mobile-menu-button" type="button" aria-label="Toggle navigation menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>
+            <span /><span /><span />
+          </button>
         </div>
+        {mobileOpen && <nav className="mobile-menu" aria-label="Mobile navigation">
+          <a href="/#destinations" onClick={closeMobileMenu}>Destinations</a>
+          <a href="/#how-it-works" onClick={closeMobileMenu}>How It Works</a>
+          <a href="/#contact" onClick={closeMobileMenu}>Contact</a>
+          {user?.role !== 'CUSTOMER' && <Link to="/admin" onClick={closeMobileMenu}>Admin</Link>}
+          {user ? <><Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link><button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
+        </nav>}
       </header>
 
       <main key={location.pathname} className="page-transition">

@@ -13,6 +13,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const navigate = useNavigate()
   const { login } = useAuth()
@@ -23,35 +24,25 @@ export default function Register() {
     const normalizedEmail = email.trim().toLowerCase()
     const normalizedPhone = phone.replace(/[\s()-]/g, '')
 
-    if (!normalizedName || !normalizedEmail || !phone || !password || !confirmPassword) {
-      setError('Please fill in all fields.')
-      return
-    }
-    if (normalizedName.length < 2 || normalizedName.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(normalizedName)) {
-      setError('Enter a valid full name using letters, spaces, apostrophes, or hyphens.')
-      return
-    }
-    if (!isValidEmail(normalizedEmail)) {
-      setError('Enter a valid email address.')
-      return
-    }
-    if (!isValidPhone(phone)) {
-      setError('Enter a valid phone number with 10 to 15 digits. It cannot be negative.')
-      return
-    }
+    const errors = {}
+    if (!normalizedName) errors.fullName = 'Full name is required.'
+    else if (normalizedName.length < 2 || normalizedName.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(normalizedName)) errors.fullName = 'Use letters, spaces, apostrophes, or hyphens only.'
+    if (!normalizedEmail) errors.email = 'Email is required.'
+    else if (!isValidEmail(normalizedEmail)) errors.email = 'Enter a valid email address.'
+    if (!phone) errors.phone = 'Phone number is required.'
+    else if (!isValidPhone(phone)) errors.phone = 'Use 10–15 digits; a phone number cannot be negative.'
     const invalidPassword = passwordError(password)
-    if (invalidPassword) {
-      setError(invalidPassword)
+    if (!password) errors.password = 'Password is required.'
+    else if (invalidPassword) errors.password = invalidPassword
+    if (!confirmPassword) errors.confirmPassword = 'Please confirm your password.'
+    else if (password !== confirmPassword) errors.confirmPassword = 'Passwords do not match.'
+    if (!agreed) errors.agreed = 'You must accept the terms to continue.'
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors)
+      setError('')
       return
     }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.')
-      return
-    }
-    if (!agreed) {
-      setError('Please agree to the Terms and Conditions.')
-      return
-    }
+    setFieldErrors({})
     setError('')
 
     try {
@@ -121,10 +112,11 @@ export default function Register() {
                 required
                 minLength={2}
                 maxLength={100}
-                style={inputStyle}
+                style={{ ...inputStyle, borderColor: fieldErrors.fullName ? '#dc2626' : '#e0e0e0' }}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
               />
+              {fieldErrors.fullName && <p className="field-error">{fieldErrors.fullName}</p>}
             </div>
 
             <div>
@@ -137,10 +129,11 @@ export default function Register() {
                 autoComplete="email"
                 required
                 maxLength={254}
-                style={inputStyle}
+                style={{ ...inputStyle, borderColor: fieldErrors.email ? '#dc2626' : '#e0e0e0' }}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
               />
+              {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
             </div>
 
             <div>
@@ -154,10 +147,11 @@ export default function Register() {
                 inputMode="tel"
                 required
                 maxLength={20}
-                style={inputStyle}
+                style={{ ...inputStyle, borderColor: fieldErrors.phone ? '#dc2626' : '#e0e0e0' }}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
               />
+              {fieldErrors.phone && <p className="field-error">{fieldErrors.phone}</p>}
             </div>
 
             <div>
@@ -172,7 +166,7 @@ export default function Register() {
                   required
                   minLength={8}
                   maxLength={72}
-                  style={{ ...inputStyle, paddingRight: 44 }}
+                  style={{ ...inputStyle, paddingRight: 44, borderColor: fieldErrors.password ? '#dc2626' : '#e0e0e0' }}
                   onFocus={focusHandler}
                   onBlur={blurHandler}
                 />
@@ -184,6 +178,7 @@ export default function Register() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
+              {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
             </div>
 
             <div>
@@ -197,35 +192,16 @@ export default function Register() {
                 required
                 minLength={8}
                 maxLength={72}
-                style={inputStyle}
+                style={{ ...inputStyle, borderColor: fieldErrors.confirmPassword ? '#dc2626' : '#e0e0e0' }}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
               />
+              {fieldErrors.confirmPassword && <p className="field-error">{fieldErrors.confirmPassword}</p>}
             </div>
 
             {/* Terms */}
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-              <div
-                onClick={() => setAgreed(v => !v)}
-                role="checkbox"
-                aria-checked={agreed}
-                tabIndex={0}
-                onKeyDown={e => {
-                  if (e.key === ' ' || e.key === 'Enter') {
-                    e.preventDefault()
-                    setAgreed(v => !v)
-                  }
-                }}
-                style={{
-                  minWidth: 18, height: 18, borderRadius: 5,
-                  border: `2px solid ${agreed ? '#00c472' : '#ccc'}`,
-                  background: agreed ? '#00c472' : '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer', marginTop: 1, transition: 'all 0.15s',
-                }}
-              >
-                {agreed && <span style={{ color: '#fff', fontSize: 11, fontWeight: 900 }}>✓</span>}
-              </div>
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required style={{ accentColor: '#00c472', width: 18, height: 18, marginTop: 1 }} />
               <span style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
                 I agree to the{' '}
                 <a href="#" style={{ color: '#00c472', textDecoration: 'none', fontWeight: 600 }}>Terms and Conditions</a>
@@ -233,6 +209,7 @@ export default function Register() {
                 <a href="#" style={{ color: '#00c472', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
               </span>
             </label>
+            {fieldErrors.agreed && <p className="field-error" style={{ marginTop: -10 }}>{fieldErrors.agreed}</p>}
 
             <button
               type="submit"

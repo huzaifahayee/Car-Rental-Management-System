@@ -9,6 +9,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   const navigate = useNavigate()
   const { login } = useAuth()
@@ -16,14 +17,16 @@ export default function Login() {
   async function handleSubmit(e) {
     e.preventDefault()
     const normalizedEmail = email.trim()
-    if (!normalizedEmail || !password) {
-      setError('Please fill in all fields.')
+    const errors = {}
+    if (!normalizedEmail) errors.email = 'Email is required.'
+    else if (!isValidEmail(normalizedEmail)) errors.email = 'Enter a valid email address.'
+    if (!password) errors.password = 'Password is required.'
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors)
+      setError('')
       return
     }
-    if (!isValidEmail(normalizedEmail)) {
-      setError('Enter a valid email address.')
-      return
-    }
+    setFieldErrors({})
     setError('')
 
     try {
@@ -76,13 +79,14 @@ export default function Login() {
                 required
                 maxLength={254}
                 style={{
-                  width: '100%', padding: '11px 14px', border: '1.5px solid #e0e0e0',
+                  width: '100%', padding: '11px 14px', border: `1.5px solid ${fieldErrors.email ? '#dc2626' : '#e0e0e0'}`,
                   borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
                   boxSizing: 'border-box', transition: 'border-color 0.15s',
                 }}
                 onFocus={e => { e.currentTarget.style.borderColor = '#00c472' }}
                 onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0' }}
               />
+              {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
             </div>
 
             <div>
@@ -103,7 +107,7 @@ export default function Login() {
                   minLength={8}
                   maxLength={72}
                   style={{
-                    width: '100%', padding: '11px 44px 11px 14px', border: '1.5px solid #e0e0e0',
+                    width: '100%', padding: '11px 44px 11px 14px', border: `1.5px solid ${fieldErrors.password ? '#dc2626' : '#e0e0e0'}`,
                     borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
                     boxSizing: 'border-box', transition: 'border-color 0.15s',
                   }}
@@ -118,6 +122,7 @@ export default function Login() {
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
+              {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
             </div>
 
             <button
