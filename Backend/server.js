@@ -5,7 +5,7 @@ const authRoutes = require("./routes/auth")
 const settingsRoutes = require("./routes/settings")
 const vehicleRoutes = require("./routes/vehicles")
 const bookingRoutes = require("./routes/bookings")
-const dashboardRoutes = require("./routes/dashboard")
+const dashboardRoutes = require("./routes/dashboard.js")
 
 const app = express()
 
