@@ -63,9 +63,11 @@ model VehiclePackage {
 
 model Booking {
   id               Int           @id @default(autoincrement())
+  bookingReference String        @unique
   status           BookingStatus @default(PENDING)
   pickupDateTime   DateTime
   returnDateTime   DateTime
+  paymentMethod    String
   paymentReference String?
   createdAt        DateTime      @default(now())
 

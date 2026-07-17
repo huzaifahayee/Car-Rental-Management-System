@@ -1,8 +1,14 @@
-async function createBooking(req, res) {
-  const { vehiclePackageId, pickupDateTime, returnDateTime, paymentReference } = req.body
+const crypto = require('crypto')
 
-  if (!vehiclePackageId || !pickupDateTime || !returnDateTime) {
-    return res.status(400).json({ error: 'vehiclePackageId, pickupDateTime, and returnDateTime are required.' })
+function generateBookingReference() {
+  return `GT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+}
+
+async function createBooking(req, res) {
+  const { vehiclePackageId, pickupDateTime, returnDateTime, paymentMethod, paymentReference } = req.body
+
+  if (!vehiclePackageId || !pickupDateTime || !returnDateTime || !paymentMethod) {
+    return res.status(400).json({ error: 'vehiclePackageId, pickupDateTime, returnDateTime, and paymentMethod are required.' })
   }
 
   try {
@@ -14,10 +20,12 @@ async function createBooking(req, res) {
 
     const booking = await req.prisma.booking.create({
       data: {
+        bookingReference: generateBookingReference(),
         customerId: req.user.userId,
         vehiclePackageId: Number(vehiclePackageId),
         pickupDateTime: new Date(pickupDateTime),
         returnDateTime: new Date(returnDateTime),
+        paymentMethod,
         paymentReference,
       },
     })
