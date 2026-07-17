@@ -1,5 +1,5 @@
 async function getVehicles(req, res) {
-  const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status } = req.query
+  const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status, sort } = req.query
 
   const where = {}
 
@@ -15,8 +15,12 @@ async function getVehicles(req, res) {
     if (maxPrice) where.pricePerDay.lte = Number(maxPrice)
   }
 
+  let orderBy = { createdAt: 'desc' }
+  if (sort === 'price_asc') orderBy = { pricePerDay: 'asc' }
+  if (sort === 'price_desc') orderBy = { pricePerDay: 'desc' }
+
   try {
-    const vehicles = await req.prisma.vehiclePackage.findMany({ where })
+    const vehicles = await req.prisma.vehiclePackage.findMany({ where, orderBy })
     res.json(vehicles)
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch vehicles', details: err.message })
