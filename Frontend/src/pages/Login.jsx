@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
+import { isValidEmail } from '../lib/validation'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -14,8 +15,13 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!email || !password) {
+    const normalizedEmail = email.trim()
+    if (!normalizedEmail || !password) {
       setError('Please fill in all fields.')
+      return
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Enter a valid email address.')
       return
     }
     setError('')
@@ -23,7 +29,7 @@ export default function Login() {
     try {
       const data = await apiFetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       })
       login(data.token, data.user)
       navigate(data.user.role === 'ADMIN' || data.user.role === 'EMPLOYEE' ? '/admin' : '/')
@@ -66,6 +72,9 @@ export default function Login() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                autoComplete="email"
+                required
+                maxLength={254}
                 style={{
                   width: '100%', padding: '11px 14px', border: '1.5px solid #e0e0e0',
                   borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
@@ -89,6 +98,10 @@ export default function Login() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
+                  minLength={8}
+                  maxLength={72}
                   style={{
                     width: '100%', padding: '11px 44px 11px 14px', border: '1.5px solid #e0e0e0',
                     borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',

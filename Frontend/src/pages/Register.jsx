@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
+import { isValidEmail, isValidPhone, passwordError } from '../lib/validation'
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
@@ -18,8 +19,29 @@ export default function Register() {
 
  async function handleSubmit(e) {
     e.preventDefault()
-    if (!fullName || !email || !phone || !password || !confirmPassword) {
+    const normalizedName = fullName.trim().replace(/\s+/g, ' ')
+    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedPhone = phone.replace(/[\s()-]/g, '')
+
+    if (!normalizedName || !normalizedEmail || !phone || !password || !confirmPassword) {
       setError('Please fill in all fields.')
+      return
+    }
+    if (normalizedName.length < 2 || normalizedName.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(normalizedName)) {
+      setError('Enter a valid full name using letters, spaces, apostrophes, or hyphens.')
+      return
+    }
+    if (!isValidEmail(normalizedEmail)) {
+      setError('Enter a valid email address.')
+      return
+    }
+    if (!isValidPhone(phone)) {
+      setError('Enter a valid phone number with 10 to 15 digits. It cannot be negative.')
+      return
+    }
+    const invalidPassword = passwordError(password)
+    if (invalidPassword) {
+      setError(invalidPassword)
       return
     }
     if (password !== confirmPassword) {
@@ -35,7 +57,7 @@ export default function Register() {
     try {
       const data = await apiFetch('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ fullName, email, phone, password }),
+        body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, password }),
       })
       login(data.token, data.user)
       navigate('/')
@@ -95,6 +117,10 @@ export default function Register() {
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 placeholder="Your full name"
+                autoComplete="name"
+                required
+                minLength={2}
+                maxLength={100}
                 style={inputStyle}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
@@ -108,6 +134,9 @@ export default function Register() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="you@example.com"
+                autoComplete="email"
+                required
+                maxLength={254}
                 style={inputStyle}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
@@ -119,8 +148,12 @@ export default function Register() {
               <input
                 type="tel"
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
+                onChange={e => setPhone(e.target.value.replace(/[^\d+()\s-]/g, ''))}
                 placeholder="+92 300 0000000"
+                autoComplete="tel"
+                inputMode="tel"
+                required
+                maxLength={20}
                 style={inputStyle}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
@@ -135,6 +168,10 @@ export default function Register() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="Create a strong password"
+                  autoComplete="new-password"
+                  required
+                  minLength={8}
+                  maxLength={72}
                   style={{ ...inputStyle, paddingRight: 44 }}
                   onFocus={focusHandler}
                   onBlur={blurHandler}
@@ -156,6 +193,10 @@ export default function Register() {
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter your password"
+                autoComplete="new-password"
+                required
+                minLength={8}
+                maxLength={72}
                 style={inputStyle}
                 onFocus={focusHandler}
                 onBlur={blurHandler}
@@ -166,6 +207,15 @@ export default function Register() {
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
               <div
                 onClick={() => setAgreed(v => !v)}
+                role="checkbox"
+                aria-checked={agreed}
+                tabIndex={0}
+                onKeyDown={e => {
+                  if (e.key === ' ' || e.key === 'Enter') {
+                    e.preventDefault()
+                    setAgreed(v => !v)
+                  }
+                }}
                 style={{
                   minWidth: 18, height: 18, borderRadius: 5,
                   border: `2px solid ${agreed ? '#00c472' : '#ccc'}`,

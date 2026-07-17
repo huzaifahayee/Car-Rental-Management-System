@@ -1,5 +1,5 @@
 // Frontend/src/pages/Home.jsx
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
@@ -7,9 +7,9 @@ const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, a
 
 // PLACEHOLDER: dummy stats, replace with real numbers once available
 const STATS = [
-  { value: '500+', label: 'Car Vendors' },
-  { value: '50+', label: 'Cities Covered' },
-  { value: '5M+', label: 'Happy Travelers' },
+  { value: 500, suffix: '+', label: 'Car Vendors' },
+  { value: 50, suffix: '+', label: 'Cities Covered' },
+  { value: 5, suffix: 'M+', label: 'Happy Travelers' },
   { value: '24/7', label: 'Customer Support' },
 ]
 
@@ -60,18 +60,47 @@ const HOW_TO_STEPS = [
   { step: 6, title: 'Checkout and Confirm', desc: 'Complete the payment securely and receive your booking confirmation instantly.' },
 ]
 
+const TRUST_POINTS = [
+  { icon: '✓', title: 'Verified rental partners', text: 'Trusted vendors and transparent pricing.' },
+  { icon: '⌁', title: 'Instant booking support', text: 'Help whenever your plans change.' },
+  { icon: '🔒', title: 'Secure, simple booking', text: 'Your trip details stay protected.' },
+]
+
 export default function Home() {
   const navigate = useNavigate()
+  const heroRef = useRef(null)
   const [tripType, setTripType] = useState('within')
   const [pickup, setPickup] = useState('')
   const [dropoff, setDropoff] = useState('')
   const [pickupTime, setPickupTime] = useState('')
   const [returnTime, setReturnTime] = useState('')
 
+  function handleHeroMove(event) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !heroRef.current) return
+    const bounds = heroRef.current.getBoundingClientRect()
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5
+    heroRef.current.style.setProperty('--hero-shift-x', `${x * -10}px`)
+    heroRef.current.style.setProperty('--hero-shift-y', `${y * -7}px`)
+    heroRef.current.style.setProperty('--card-shift-x', `${x * 8}px`)
+    heroRef.current.style.setProperty('--card-shift-y', `${y * 6}px`)
+  }
+
+  function resetHeroMove() {
+    heroRef.current?.style.setProperty('--hero-shift-x', '0px')
+    heroRef.current?.style.setProperty('--hero-shift-y', '0px')
+    heroRef.current?.style.setProperty('--card-shift-x', '0px')
+    heroRef.current?.style.setProperty('--card-shift-y', '0px')
+  }
+
   return (
     <>
       {/* Hero */}
       <section
+        ref={heroRef}
+        className="hero-section"
+        onMouseMove={handleHeroMove}
+        onMouseLeave={resetHeroMove}
         style={{
           background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
           position: 'relative',
@@ -79,6 +108,7 @@ export default function Home() {
         }}
       >
         <div
+          className="hero-background"
           style={{
             position: 'absolute', inset: 0,
             backgroundImage: `url(https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1600&h=600&fit=crop&auto=format)`,
@@ -87,17 +117,24 @@ export default function Home() {
           }}
         />
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,32,39,0.6) 0%, rgba(15,32,39,0.85) 100%)' }} />
+        <div className="hero-ambient hero-ambient-one" aria-hidden="true" />
+        <div className="hero-ambient hero-ambient-two" aria-hidden="true" />
+        <div className="hero-road-lines" aria-hidden="true" />
 
-        <div className="relative max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
-          <p style={{ color: '#00c472', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+        <div className="hero-content relative max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
+          <p className="hero-enter hero-enter-1" style={{ color: '#00c472', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
             Car Rental Booking
           </p>
-          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 44px)', lineHeight: 1.2, marginBottom: 12 }}>
+          <h1 className="hero-enter hero-enter-2" style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 44px)', lineHeight: 1.2, marginBottom: 12 }}>
             {HERO_HEADLINE}
           </h1>
-          <p style={{ color: '#b0c4d4', fontSize: 15, marginBottom: 44 }}>{HERO_SUBHEADING}</p>
+          <p className="hero-enter hero-enter-3" style={{ color: '#b0c4d4', fontSize: 15, marginBottom: 14 }}>{HERO_SUBHEADING}</p>
+          <div className="hero-proof hero-enter hero-enter-3">
+            <span className="hero-proof-stars">★★★★★</span>
+            <span>Trusted by travellers across Pakistan</span>
+          </div>
 
-          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: '28px 32px', textAlign: 'left' }}>
+          <div className="hero-search-card hero-enter hero-enter-4" style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: '28px 32px', textAlign: 'left' }}>
             <div className="flex gap-6 mb-5">
               {['within', 'out'].map(type => (
                 <label key={type} className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
@@ -154,7 +191,14 @@ export default function Home() {
               ))}
             </div>
 
+            <div className="route-preview" aria-label="Your planned route preview">
+              <span className="route-place">{pickup || 'Pickup location'}</span>
+              <span className="route-line" aria-hidden="true"><i /></span>
+              <span className="route-place route-place-end">{dropoff || 'Drop-off location'}</span>
+            </div>
+
             <button
+              className="search-cta"
               style={{
                 background: 'linear-gradient(90deg, #00c472, #00a85a)',
                 color: '#fff', border: 'none', borderRadius: 12,
@@ -170,23 +214,33 @@ export default function Home() {
               Search Available Cars
             </button>
           </div>
+
         </div>
       </section>
 
       {/* Stats bar */}
       <section style={{ background: '#fff', borderBottom: '1px solid #eee' }}>
         <div className="max-w-5xl mx-auto px-6 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          {STATS.map(s => (
-            <div key={s.label}>
-              <div style={{ fontSize: 26, fontWeight: 800, color: '#00c472' }}>{s.value}</div>
-              <div style={{ fontSize: 13, color: '#777', fontWeight: 500 }}>{s.label}</div>
+          {STATS.map((s, index) => <Stat key={s.label} {...s} delay={index * 90} />)}
+        </div>
+      </section>
+
+      <section className="trust-section">
+        <div className="max-w-6xl mx-auto px-6 py-7 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {TRUST_POINTS.map((point, index) => (
+            <div className="trust-card" key={point.title} style={{ animationDelay: `${index * 100}ms` }}>
+              <div className="trust-icon" aria-hidden="true">{point.icon}</div>
+              <div>
+                <h2>{point.title}</h2>
+                <p>{point.text}</p>
+              </div>
             </div>
           ))}
         </div>
       </section>
 
       {/* Popular destinations */}
-      <section id="destinations" className="max-w-6xl mx-auto px-6 py-14">
+      <section id="destinations" className="max-w-6xl mx-auto px-6 py-14 scroll-reveal">
         <h2 style={{ fontWeight: 800, fontSize: 22, color: '#1a1a2e', marginBottom: 6 }}>Popular Car Rental Destinations</h2>
         <p style={{ color: '#777', fontSize: 14, marginBottom: 20 }}>Explore car rental options across major cities in Pakistan</p>
         <div className="flex flex-wrap gap-3">
@@ -209,7 +263,7 @@ export default function Home() {
       </section>
 
       {/* City editorial */}
-      <section style={{ background: '#fff' }}>
+      <section className="scroll-reveal" style={{ background: '#fff' }}>
         <div className="max-w-6xl mx-auto px-6 py-14">
           <h2 style={{ fontWeight: 800, fontSize: 22, color: '#1a1a2e', marginBottom: 4 }}>Car Rental Services Across Pakistan</h2>
           <p style={{ color: '#777', fontSize: 14, marginBottom: 32 }}>Comprehensive car rental solutions in every major city</p>
@@ -217,7 +271,7 @@ export default function Home() {
             {CITY_CONTENT.map(({ city, text }) => (
               <div key={city} style={{ borderLeft: '3px solid #00c472', paddingLeft: 20 }}>
                 <h3 style={{ fontWeight: 700, fontSize: 16, color: '#1a1a2e', marginBottom: 8 }}>{city}</h3>
-                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.75 }}>{text}</p>
+                <ScrollWords text={text} />
               </div>
             ))}
           </div>
@@ -225,11 +279,11 @@ export default function Home() {
       </section>
 
       {/* How-to steps */}
-      <section id="how-it-works" style={{ background: 'linear-gradient(135deg, #f0fdf7 0%, #e8f8f0 100%)' }}>
+      <section id="how-it-works" className="scroll-reveal" style={{ background: 'linear-gradient(135deg, #f0fdf7 0%, #e8f8f0 100%)' }}>
         <div className="max-w-5xl mx-auto px-6 py-16">
           <div className="text-center mb-12">
-            <h2 style={{ fontWeight: 800, fontSize: 26, color: '#1a1a2e', marginBottom: 8 }}>How to Book a Car</h2>
-            <p style={{ color: '#666', fontSize: 15 }}>Simple steps to get your rental car booked in minutes</p>
+            <ScrollWords as="h2" text="How to Book a Car" style={{ fontWeight: 800, fontSize: 26, color: '#1a1a2e', marginBottom: 8 }} />
+            <ScrollWords text="Simple steps to get your rental car booked in minutes" style={{ color: '#666', fontSize: 15 }} />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {HOW_TO_STEPS.map(({ step, title, desc }) => (
@@ -253,8 +307,8 @@ export default function Home() {
                   {step}
                 </div>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 4 }}>{title}</div>
-                  <div style={{ fontSize: 13.5, color: '#666', lineHeight: 1.65 }}>{desc}</div>
+                  <ScrollWords as="div" text={title} style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 4 }} />
+                  <ScrollWords text={desc} style={{ fontSize: 13.5, color: '#666', lineHeight: 1.65 }} />
                 </div>
               </div>
             ))}
@@ -262,5 +316,91 @@ export default function Home() {
         </div>
       </section>
     </>
+  )
+}
+
+function Stat({ value, suffix = '', label, delay }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true)
+        observer.disconnect()
+      }
+    }, { threshold: 0.35 })
+
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} className={visible ? 'stat-visible' : 'stat-hidden'} style={{ transitionDelay: `${delay}ms` }}>
+      <div style={{ fontSize: 26, fontWeight: 800, color: '#00c472' }}>
+        {typeof value === 'number' ? <CountUp target={value} active={visible} /> : value}{suffix}
+      </div>
+      <div style={{ fontSize: 13, color: '#777', fontWeight: 500 }}>{label}</div>
+    </div>
+  )
+}
+
+function CountUp({ target, active }) {
+  const [count, setCount] = useState(0)
+
+  useEffect(() => {
+    if (!active) return undefined
+
+    const duration = 850
+    const startTime = performance.now()
+    let frameId
+
+    function tick(now) {
+      const progress = Math.min((now - startTime) / duration, 1)
+      setCount(Math.round(target * (1 - Math.pow(1 - progress, 3))))
+      if (progress < 1) frameId = requestAnimationFrame(tick)
+    }
+
+    frameId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameId)
+  }, [active, target])
+
+  return count
+}
+
+function ScrollWords({ text, as: Tag = 'p', style }) {
+  const ref = useRef(null)
+  const [visible, setVisible] = useState(false)
+  const [hasUserScrolled, setHasUserScrolled] = useState(false)
+
+  useEffect(() => {
+    function enableReveal() {
+      setHasUserScrolled(true)
+    }
+
+    window.addEventListener('scroll', enableReveal, { once: true, passive: true })
+    return () => window.removeEventListener('scroll', enableReveal)
+  }, [])
+
+  useEffect(() => {
+    if (!hasUserScrolled) return undefined
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true)
+        observer.disconnect()
+      }
+    }, { threshold: 0.2 })
+
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [hasUserScrolled])
+
+  return (
+    <Tag ref={ref} className={visible ? 'scroll-words scroll-words-visible' : 'scroll-words'} style={style || { fontSize: 14, color: '#555', lineHeight: 1.75 }}>
+      {text.split(' ').map((word, index) => (
+        <span key={`${word}-${index}`} style={{ transitionDelay: `${Math.min(index * 18, 520)}ms` }}>{word}&nbsp;</span>
+      ))}
+    </Tag>
   )
 }

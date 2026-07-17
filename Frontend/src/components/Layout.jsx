@@ -49,7 +49,9 @@ export default function Layout() {
         </div>
       </header>
 
-      <Outlet />
+      <main key={location.pathname} className="page-transition">
+        <Outlet />
+      </main>
 
       {!isAuthPage && <Footer />}
     </div>
