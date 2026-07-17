@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "VehiclePackage" ADD COLUMN     "imageUrls" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ALTER COLUMN "make" DROP DEFAULT,
+ALTER COLUMN "model" DROP DEFAULT,
+ALTER COLUMN "seatingCapacity" DROP DEFAULT;

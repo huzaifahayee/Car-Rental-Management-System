@@ -56,6 +56,7 @@ model VehiclePackage {
   dropoffCity   String
   status        VehicleStatus @default(AVAILABLE)
   createdAt     DateTime     @default(now())
+  imageUrls String[] @default([])
 
   bookings      Booking[]
 }
