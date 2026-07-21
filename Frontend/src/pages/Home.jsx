@@ -1,6 +1,8 @@
 // Frontend/src/pages/Home.jsx
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import apiFetch from '../lib/apiClient'
+import LocationAutocomplete from '../components/LocationAutocomplete'
 
 const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
 const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, and reliable'
@@ -69,11 +71,50 @@ const TRUST_POINTS = [
 export default function Home() {
   const navigate = useNavigate()
   const heroRef = useRef(null)
+
+  // Trip Type: within city vs out of city
   const [tripType, setTripType] = useState('within')
-  const [pickup, setPickup] = useState('')
-  const [dropoff, setDropoff] = useState('')
+
+  // Rental Mode: WITH_DRIVER vs SELF_DRIVE
+  const [rentalMode, setRentalMode] = useState('WITH_DRIVER')
+
+  // With-driver address state
+  const [pickupAddress, setPickupAddress] = useState('')
+  const [pickupLat, setPickupLat] = useState(null)
+  const [pickupLng, setPickupLng] = useState(null)
+
+  const [dropoffAddress, setDropoffAddress] = useState('')
+  const [dropoffLat, setDropoffLat] = useState(null)
+  const [dropoffLng, setDropoffLng] = useState(null)
+
+  // Self-drive outlet state
+  const [outlets, setOutlets] = useState([])
+  const [selectedOutletId, setSelectedOutletId] = useState('')
+  const [loadingOutlets, setLoadingOutlets] = useState(false)
+  const [outletError, setOutletError] = useState('')
+
+  // Dates
   const [pickupTime, setPickupTime] = useState('')
   const [returnTime, setReturnTime] = useState('')
+
+  const [validationError, setValidationError] = useState('')
+
+  // Fetch active outlets when Self-Drive is chosen
+  useEffect(() => {
+    if (rentalMode === 'SELF_DRIVE' && outlets.length === 0) {
+      setLoadingOutlets(true)
+      setOutletError('')
+      apiFetch('/outlets')
+        .then((data) => {
+          setOutlets(data)
+          if (data.length > 0) {
+            setSelectedOutletId(String(data[0].id))
+          }
+        })
+        .catch((err) => setOutletError(err.message))
+        .finally(() => setLoadingOutlets(false))
+    }
+  }, [rentalMode, outlets.length])
 
   function handleHeroMove(event) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !heroRef.current) return
@@ -93,6 +134,41 @@ export default function Home() {
     heroRef.current?.style.setProperty('--card-shift-y', '0px')
   }
 
+  function handleSearch() {
+    setValidationError('')
+
+    if (rentalMode === 'WITH_DRIVER') {
+      if (!pickupAddress.trim()) {
+        setValidationError('Please enter a pickup location.')
+        return
+      }
+    } else {
+      if (!selectedOutletId) {
+        setValidationError('Please select an outlet location.')
+        return
+      }
+    }
+
+    const selectedOutlet = outlets.find((o) => o.id === Number(selectedOutletId))
+
+    navigate('/search', {
+      state: {
+        tripType,
+        rentalMode,
+        pickupAddress,
+        pickupLat,
+        pickupLng,
+        dropoffAddress,
+        dropoffLat,
+        dropoffLng,
+        outletId: selectedOutletId ? Number(selectedOutletId) : null,
+        selectedOutlet: selectedOutlet || null,
+        pickupTime,
+        returnTime,
+      },
+    })
+  }
+
   return (
     <>
       {/* Hero */}
@@ -110,9 +186,11 @@ export default function Home() {
         <div
           className="hero-background"
           style={{
-            position: 'absolute', inset: 0,
+            position: 'absolute',
+            inset: 0,
             backgroundImage: `url(https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1600&h=600&fit=crop&auto=format)`,
-            backgroundSize: 'cover', backgroundPosition: 'center',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
             opacity: 0.18,
           }}
         />
@@ -135,67 +213,176 @@ export default function Home() {
           </div>
 
           <div className="hero-search-card hero-enter hero-enter-4" style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: '28px 32px', textAlign: 'left' }}>
-            <div className="flex gap-6 mb-5">
-              {['within', 'out'].map(type => (
-                <label key={type} className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
-                  <div
-                    onClick={() => setTripType(type)}
-                    style={{
-                      width: 18, height: 18, borderRadius: '50%',
-                      border: `2px solid ${tripType === type ? '#00c472' : '#ccc'}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', flexShrink: 0,
-                    }}
-                  >
-                    {tripType === type && <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#00c472' }} />}
-                  </div>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
-                    {type === 'within' ? 'Within City' : 'Out of City'}
-                  </span>
-                </label>
-              ))}
+            
+            {/* Toggles Row */}
+            <div className="flex flex-wrap gap-6 mb-6 pb-4" style={{ borderBottom: '1px solid #f0f0f0' }}>
+              {/* Trip Type Toggle */}
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Trip Type</p>
+                <div className="flex gap-4">
+                  {['within', 'out'].map(type => (
+                    <label key={type} className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
+                      <div
+                        onClick={() => setTripType(type)}
+                        style={{
+                          width: 18, height: 18, borderRadius: '50%',
+                          border: `2px solid ${tripType === type ? '#00c472' : '#ccc'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', flexShrink: 0,
+                        }}
+                      >
+                        {tripType === type && <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#00c472' }} />}
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
+                        {type === 'within' ? 'Within City' : 'Out of City'}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rental Mode Toggle */}
+              <div>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Rental Mode</p>
+                <div className="flex gap-4">
+                  {[
+                    { mode: 'WITH_DRIVER', label: 'With-Driver' },
+                    { mode: 'SELF_DRIVE', label: 'Self-Drive (Without Driver)' },
+                  ].map(({ mode, label }) => (
+                    <label key={mode} className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
+                      <div
+                        onClick={() => setRentalMode(mode)}
+                        style={{
+                          width: 18, height: 18, borderRadius: '50%',
+                          border: `2px solid ${rentalMode === mode ? '#00c472' : '#ccc'}`,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          cursor: 'pointer', flexShrink: 0,
+                        }}
+                      >
+                        {rentalMode === mode && <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#00c472' }} />}
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
+                        {label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
 
+            {/* Inputs Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {[
-                { label: 'Pickup Location', value: pickup, setter: setPickup, placeholder: 'Enter pickup city or area' },
-                { label: 'Drop-off Location', value: dropoff, setter: setDropoff, placeholder: 'Enter drop-off city or area' },
-              ].map(({ label, value, setter, placeholder }) => (
-                <div key={label}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</label>
+              {rentalMode === 'WITH_DRIVER' ? (
+                <>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Pickup Location</label>
+                    <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                      <LocationAutocomplete
+                        value={pickupAddress}
+                        onChange={(text) => setPickupAddress(text)}
+                        onSelectLocation={({ address, lat, lng }) => {
+                          setPickupAddress(address)
+                          setPickupLat(lat)
+                          setPickupLng(lng)
+                        }}
+                        placeholder="Enter pickup address or landmark"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
+                      Drop-off Location {tripType === 'within' ? '(Optional)' : ''}
+                    </label>
+                    <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                      <LocationAutocomplete
+                        value={dropoffAddress}
+                        onChange={(text) => setDropoffAddress(text)}
+                        onSelectLocation={({ address, lat, lng }) => {
+                          setDropoffAddress(address)
+                          setDropoffLat(lat)
+                          setDropoffLng(lng)
+                        }}
+                        placeholder="Enter drop-off address or city"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="md:col-span-2">
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Pick Branch / Outlet Location (Self-Drive)
+                  </label>
                   <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
-                    <input
-                      value={value}
-                      onChange={e => setter(e.target.value)}
-                      placeholder={placeholder}
-                      style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
-                    />
+                    {loadingOutlets ? (
+                      <p style={{ margin: 0, fontSize: 14, color: '#888' }}>Loading branch locations...</p>
+                    ) : outletError ? (
+                      <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>{outletError}</p>
+                    ) : outlets.length === 0 ? (
+                      <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>No outlets configured for this agency yet. Please contact support.</p>
+                    ) : (
+                      <select
+                        value={selectedOutletId}
+                        onChange={(e) => setSelectedOutletId(e.target.value)}
+                        style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
+                      >
+                        {outlets.map((outlet) => (
+                          <option key={outlet.id} value={outlet.id}>
+                            {outlet.city} — {outlet.name} ({outlet.addressText})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
-              ))}
-              {[
-                { label: 'Pickup Date and Time', value: pickupTime, setter: setPickupTime },
-                { label: 'Return Date and Time', value: returnTime, setter: setReturnTime },
-              ].map(({ label, value, setter }) => (
-                <div key={label}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>{label}</label>
-                  <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
-                    <input
-                      type="datetime-local"
-                      value={value}
-                      onChange={e => setter(e.target.value)}
-                      style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
-                    />
-                  </div>
+              )}
+
+              {/* Datetime Pickers */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Pickup Date and Time</label>
+                <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                  <input
+                    type="datetime-local"
+                    value={pickupTime}
+                    onChange={e => setPickupTime(e.target.value)}
+                    style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
+                  />
                 </div>
-              ))}
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Return Date and Time</label>
+                <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                  <input
+                    type="datetime-local"
+                    value={returnTime}
+                    onChange={e => setReturnTime(e.target.value)}
+                    style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
+                  />
+                </div>
+              </div>
             </div>
 
+            {/* Route preview */}
             <div className="route-preview" aria-label="Your planned route preview">
-              <span className="route-place">{pickup || 'Pickup location'}</span>
+              <span className="route-place">
+                {rentalMode === 'WITH_DRIVER'
+                  ? (pickupAddress || 'Pickup location')
+                  : (outlets.find(o => o.id === Number(selectedOutletId))?.name || 'Selected outlet')}
+              </span>
               <span className="route-line" aria-hidden="true"><i /></span>
-              <span className="route-place route-place-end">{dropoff || 'Drop-off location'}</span>
+              <span className="route-place route-place-end">
+                {rentalMode === 'WITH_DRIVER'
+                  ? (dropoffAddress || (tripType === 'within' ? 'Same city return' : 'Drop-off location'))
+                  : 'Self-Drive return to branch'}
+              </span>
             </div>
+
+            {validationError && (
+              <p style={{ color: '#c53030', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
+                {validationError}
+              </p>
+            )}
 
             <button
               className="search-cta"
@@ -209,7 +396,7 @@ export default function Home() {
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
               onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-              onClick={() => navigate('/search')}
+              onClick={handleSearch}
             >
               Search Available Cars
             </button>
