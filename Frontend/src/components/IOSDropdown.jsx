@@ -33,7 +33,7 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
   }, [isOpen])
 
   return (
-    <div ref={dropdownRef} style={{ position: 'relative', display: 'inline-block', width: '100%', ...style }}>
+    <div ref={dropdownRef} style={{ position: 'relative', display: 'block', width: '100%', minWidth: 0, ...style }}>
       {/* Trigger Button */}
       <button
         type="button"
@@ -41,11 +41,12 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
         style={{
           width: '100%',
           boxSizing: 'border-box',
+          minWidth: 0,
           background: '#fff',
           color: '#1a1a2e',
-          border: '1.5px solid #e0e0e0',
-          borderRadius: '24px',
-          padding: '10px 20px',
+          border: '1.5px solid #d0d5dd',
+          borderRadius: '10px',
+          padding: '11px 16px',
           fontSize: '14px',
           fontWeight: 600,
           textAlign: 'left',
@@ -57,10 +58,10 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
           gap: 8,
           transition: 'all 0.2s ease',
           boxShadow: isOpen ? '0 0 0 3px rgba(0,196,114,0.15)' : 'none',
-          borderColor: isOpen ? '#00c472' : '#e0e0e0',
+          borderColor: isOpen ? '#00c472' : '#d0d5dd',
         }}
       >
-        <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
           {selectedOpt ? selectedOpt.label : 'Select...'}
         </span>
         <svg

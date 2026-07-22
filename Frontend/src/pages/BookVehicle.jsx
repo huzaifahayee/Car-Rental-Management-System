@@ -149,7 +149,7 @@ export default function BookVehicle() {
         >
           ← Back to vehicles
         </button>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ marginTop: 18 }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start" style={{ marginTop: 18 }}>
           {/* Selected Vehicle Info */}
           <section style={cardStyle}>
             <p style={eyebrow}>Selected vehicle</p>
@@ -184,7 +184,7 @@ export default function BookVehicle() {
                 <button onClick={() => navigate('/login')} style={buttonStyle}>Sign in to book</button>
               </>
             ) : (
-              <form onSubmit={submitBooking} style={{ display: 'grid', gap: 15 }}>
+              <form onSubmit={submitBooking} style={{ display: 'flex', flexDirection: 'column', gap: 15, width: '100%', minWidth: 0 }}>
                 {/* Rental Mode (Fixed from Search Selection) */}
                 <Field label="Rental Mode">
                   <div style={{ marginTop: 4 }}>
@@ -351,7 +351,7 @@ function Confirmation({ booking, vehicle }) {
 
 function Field({ label, children }) {
   return (
-    <label style={{ display: 'grid', gap: 6, color: '#475467', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', minWidth: 0, color: '#475467', fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.7 }}>
       {label}
       {children}
     </label>
@@ -370,8 +370,8 @@ function PageState({ title, text }) {
   )
 }
 
-const cardStyle = { background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 8px 28px rgba(16,24,40,.08)' }
+const cardStyle = { background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 8px 28px rgba(16,24,40,.08)', width: '100%', minWidth: 0, boxSizing: 'border-box' }
 const eyebrow = { margin: '0 0 8px', color: '#00a85a', fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }
-const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 12px', border: '1.5px solid #d8e0e5', borderRadius: 9, color: '#1a1a2e', background: '#fff', fontSize: 14 }
-const inputContainerStyle = { border: '1.5px solid #d8e0e5', borderRadius: 9, padding: '10px 12px', background: '#fff' }
+const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 16px', border: '1.5px solid #d0d5dd', borderRadius: 10, color: '#1a1a2e', background: '#fff', fontSize: 14 }
+const inputContainerStyle = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #d0d5dd', borderRadius: 10, padding: '11px 16px', background: '#fff' }
 const buttonStyle = { width: '100%', border: 'none', borderRadius: 10, padding: '12px 16px', background: 'linear-gradient(90deg,#00c472,#00a85a)', color: '#fff', fontWeight: 800, cursor: 'pointer' }

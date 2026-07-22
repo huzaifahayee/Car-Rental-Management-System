@@ -128,7 +128,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
   const currentMinutes = Math.floor(tempDate.getMinutes() / 5) * 5
 
   return (
-    <div ref={containerRef} style={{ position: 'relative', width: '100%', ...style }}>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%', minWidth: 0, ...style }}>
       <button
         type="button"
         onClick={handleToggleOpen}
@@ -138,7 +138,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
           background: '#fff',
           border: isOpen ? '2px solid #00c472' : '1.5px solid #d0d5dd',
           borderRadius: 10,
-          padding: '10px 14px',
+          padding: '11px 16px',
           fontSize: 14,
           color: value ? '#1a1a2e' : '#667085',
           fontWeight: 500,

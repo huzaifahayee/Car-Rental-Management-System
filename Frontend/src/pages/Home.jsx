@@ -6,6 +6,9 @@ import apiFetch from '../lib/apiClient'
 import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import CustomDateTimePicker from '../components/CustomDateTimePicker'
+import VehicleCard from '../components/VehicleCard'
+
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
 const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
 const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, and reliable'
@@ -73,7 +76,8 @@ const TRUST_POINTS = [
 
 export default function Home() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+  const isStaff = !loading && user && STAFF_ROLES.includes(user.role)
   const heroRef = useRef(null)
 
   // Trip Type: within city vs out of city
@@ -200,6 +204,18 @@ export default function Home() {
         returnTime,
       },
     })
+  }
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: '#f5f7fa', color: '#667085' }}>
+        Loading dashboard…
+      </div>
+    )
+  }
+
+  if (isStaff) {
+    return <StaffHomeLanding user={user} />
   }
 
   return (
@@ -420,58 +436,22 @@ export default function Home() {
               </p>
             )}
 
-            {user && ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(user.role) ? (
-              <div style={{ display: 'flex', gap: 12 }}>
-                <button
-                  className="search-cta"
-                  style={{
-                    background: 'linear-gradient(90deg, #00c472, #00a85a)',
-                    color: '#fff', border: 'none', borderRadius: 12,
-                    padding: '14px 20px', fontWeight: 800, fontSize: 15,
-                    cursor: 'pointer', flex: 1, letterSpacing: 0.5,
-                    boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-                  onClick={handleSearch}
-                >
-                  Search Available Cars
-                </button>
-                <button
-                  style={{
-                    background: 'linear-gradient(90deg, #00c472, #00a85a)',
-                    color: '#fff', border: 'none', borderRadius: 12,
-                    padding: '14px 20px', fontWeight: 800, fontSize: 15,
-                    cursor: 'pointer', flex: 1, letterSpacing: 0.5,
-                    boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-                  onClick={() => navigate('/search', { state: {} })}
-                >
-                  View Cars
-                </button>
-              </div>
-            ) : (
-              <button
-                className="search-cta"
-                style={{
-                  background: 'linear-gradient(90deg, #00c472, #00a85a)',
-                  color: '#fff', border: 'none', borderRadius: 12,
-                  padding: '14px 48px', fontWeight: 800, fontSize: 15,
-                  cursor: 'pointer', width: '100%', letterSpacing: 0.5,
-                  boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
-                  transition: 'all 0.2s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-                onClick={handleSearch}
-              >
-                Search Available Cars
-              </button>
-            )}
+            <button
+              className="search-cta"
+              style={{
+                background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                color: '#fff', border: 'none', borderRadius: 12,
+                padding: '14px 48px', fontWeight: 800, fontSize: 15,
+                cursor: 'pointer', width: '100%', letterSpacing: 0.5,
+                boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
+              onClick={handleSearch}
+            >
+              Search Available Cars
+            </button>
           </div>
 
         </div>
@@ -575,6 +555,119 @@ export default function Home() {
         </div>
       </section>
     </>
+  )
+}
+
+function StaffHomeLanding({ user }) {
+  const [vehicles, setVehicles] = useState([])
+  const [showAllCars, setShowAllCars] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleViewAllCars() {
+    setShowAllCars(true)
+    if (vehicles.length > 0) return
+
+    setLoading(true)
+    setError('')
+    apiFetch('/vehicles')
+      .then(setVehicles)
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }
+
+  return (
+    <div style={{ background: '#f5f7fa', minHeight: '100vh' }}>
+      <section
+        style={{
+          background: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundImage: 'url(https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1600&h=600&fit=crop&auto=format)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            opacity: 0.18,
+          }}
+        />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,32,39,0.6) 0%, rgba(15,32,39,0.85) 100%)' }} />
+
+        <div className="max-w-4xl mx-auto px-6 py-20 text-center relative">
+          <p style={{ color: '#00c472', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+            Staff Dashboard
+          </p>
+          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 40px)', lineHeight: 1.2, marginBottom: 12 }}>
+            Fleet Overview
+          </h1>
+          <p style={{ color: '#b0c4d4', fontSize: 15, marginBottom: 28 }}>
+            View every vehicle in the fleet and its current status.
+          </p>
+
+          <button
+            type="button"
+            onClick={handleViewAllCars}
+            style={{
+              background: 'linear-gradient(90deg, #00c472, #00a85a)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 12,
+              padding: '14px 32px',
+              fontWeight: 800,
+              fontSize: 15,
+              cursor: 'pointer',
+              letterSpacing: 0.5,
+              boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+            }}
+          >
+            View All Cars
+          </button>
+        </div>
+      </section>
+
+      {showAllCars && (
+        <section className="max-w-7xl mx-auto px-6 py-10">
+          <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+            <h2 style={{ margin: 0, color: '#1a1a2e', fontSize: 20, fontWeight: 800 }}>
+              All Vehicles
+            </h2>
+            <p style={{ margin: 0, color: '#667085', fontSize: 14 }}>
+              {loading ? 'Loading…' : `${vehicles.length} vehicle${vehicles.length === 1 ? '' : 's'}`}
+            </p>
+          </div>
+
+          {loading && (
+            <div style={{ background: '#fff', borderRadius: 16, padding: '48px 24px', textAlign: 'center', color: '#667085' }}>
+              Loading vehicles…
+            </div>
+          )}
+
+          {error && (
+            <div style={{ background: '#fff5f5', borderRadius: 16, padding: '48px 24px', textAlign: 'center', color: '#c53030' }}>
+              Could not load vehicles: {error}
+            </div>
+          )}
+
+          {!loading && !error && vehicles.length === 0 && (
+            <div style={{ background: '#fff', borderRadius: 16, padding: '48px 24px', textAlign: 'center', color: '#667085' }}>
+              No vehicles found in the fleet.
+            </div>
+          )}
+
+          {!loading && !error && vehicles.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {vehicles.map(vehicle => (
+                <VehicleCard key={vehicle.id} vehicle={vehicle} currentUser={user} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+    </div>
   )
 }
 

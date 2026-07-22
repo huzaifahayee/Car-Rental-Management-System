@@ -22,6 +22,82 @@ const STATUS_COLORS = {
 
 const label = value => String(value).replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
 const date = value => new Intl.DateTimeFormat('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value))
+const dateTime = value => new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+
+function getBookingDays(booking) {
+  return Math.max(1, Math.ceil(
+    (new Date(booking.returnDateTime) - new Date(booking.pickupDateTime)) / (1000 * 60 * 60 * 24)
+  ))
+}
+
+function getBookingTotal(booking) {
+  return (booking.vehiclePackage?.pricePerDay || 0) * getBookingDays(booking)
+}
+
+function truncateText(text, max = 72) {
+  if (!text || text.length <= max) return text
+  return `${text.slice(0, max - 3).trim()}...`
+}
+
+function getPickupLocation(booking) {
+  if (booking.rentalMode === 'WITH_DRIVER') {
+    return truncateText(booking.pickupAddress || 'As specified')
+  }
+  if (booking.outlet) {
+    return truncateText(`${booking.outlet.name}, ${booking.outlet.city}`)
+  }
+  return 'Branch outlet'
+}
+
+function getReturnLocation(booking) {
+  if (booking.rentalMode === 'WITH_DRIVER') {
+    return truncateText(booking.dropoffAddress || 'Same as pickup')
+  }
+  if (booking.outlet) {
+    return truncateText(`${booking.outlet.name}, ${booking.outlet.city} (same branch)`)
+  }
+  return 'Same as pickup'
+}
+
+function buildBookingConfirmationMessage(booking, { approved = false } = {}) {
+  const vehicle = `${booking.vehiclePackage?.make || ''} ${booking.vehiclePackage?.model || 'Vehicle'}`.trim()
+  const days = getBookingDays(booking)
+  const rate = booking.vehiclePackage?.pricePerDay || 0
+  const total = getBookingTotal(booking)
+  const payment = label(booking.paymentMethod || 'CASH')
+  const paymentRef = booking.paymentReference ? ` (Ref: ${booking.paymentReference})` : ''
+  const rentalMode = booking.rentalMode === 'WITH_DRIVER' ? 'With Driver' : 'Self-Drive'
+  const statusLine = approved
+    ? `Your booking *${booking.bookingReference}* for *${vehicle}* has been *APPROVED & CONFIRMED*.`
+    : `Your booking *${booking.bookingReference}* for *${vehicle}* is *CONFIRMED*.`
+
+  return [
+    `Hello *${booking.customer?.fullName || 'Customer'}*!`,
+    '',
+    statusLine,
+    '',
+    `*Price:* Rs ${rate.toLocaleString()}/day x ${days} day${days === 1 ? '' : 's'} = *Rs ${total.toLocaleString()}* total`,
+    `*Payment:* ${payment}${paymentRef}`,
+    '',
+    `*Trip:* ${rentalMode}`,
+    `*Pickup:* ${getPickupLocation(booking)} | ${dateTime(booking.pickupDateTime)}`,
+    `*Return:* ${getReturnLocation(booking)} | ${dateTime(booking.returnDateTime)}`,
+    '',
+    'Thank you for choosing our Rental Service!',
+  ].join('\n')
+}
+
+function openWhatsApp(phone, message) {
+  window.open(buildWhatsAppUrl(phone, message), '_blank')
+}
+
+function buildWhatsAppUrl(phone, message) {
+  const cleaned = phone ? phone.replace(/[^0-9+]/g, '') : ''
+  const text = encodeURIComponent(message)
+  return cleaned
+    ? `https://wa.me/${cleaned.startsWith('+') ? cleaned.slice(1) : cleaned}?text=${text}`
+    : `https://wa.me/?text=${text}`
+}
 
 export default function AdminPanel() {
   const { user } = useAuth()
@@ -286,25 +362,18 @@ export default function AdminPanel() {
   }
 
   // ---- Update Booking Status & WhatsApp Confirmation ----
-  async function handleUpdateBookingStatus(bookingId, newStatus) {
+  async function handleUpdateBookingStatus(booking, newStatus) {
     try {
-      const updatedBooking = await apiFetch(`/bookings/${bookingId}/status`, {
+      const updatedBooking = await apiFetch(`/bookings/${booking.id}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus }),
       })
 
-      if (newStatus === 'CONFIRMED' && updatedBooking) {
-        const phone = updatedBooking.customer?.phone ? updatedBooking.customer.phone.replace(/[^0-9+]/g, '') : ''
-        const text = encodeURIComponent(
-          `Hello *${updatedBooking.customer?.fullName || 'Customer'}*!\n\n` +
-          `Your booking *${updatedBooking.bookingReference}* for *${updatedBooking.vehiclePackage?.make || ''} ${updatedBooking.vehiclePackage?.model || 'Vehicle'}* has been *APPROVED & CONFIRMED*!\n\n` +
-          `Return Date: ${new Date(updatedBooking.returnDateTime).toLocaleDateString()}\n\n` +
-          `Thank you for choosing our Rental Service!`
+      if (newStatus === 'CONFIRMED') {
+        openWhatsApp(
+          booking.customer?.phone,
+          buildBookingConfirmationMessage(booking, { approved: true })
         )
-        const waUrl = phone
-          ? `https://wa.me/${phone.startsWith('+') ? phone.slice(1) : phone}?text=${text}`
-          : `https://wa.me/?text=${text}`
-        window.open(waUrl, '_blank')
       }
 
       reloadData()
@@ -338,17 +407,13 @@ export default function AdminPanel() {
       })
 
       // Open WhatsApp with cancellation apology message
-      const phone = cancelBookingModal.customerPhone.replace(/[^0-9+]/g, '')
-      const text = encodeURIComponent(
+      openWhatsApp(
+        cancelBookingModal.customerPhone,
         `Hello *${cancelBookingModal.customerName}*,\n\n` +
         `We regret to inform you that your booking *${cancelBookingModal.bookingRef}* for *${cancelBookingModal.vehicleName}* has been *cancelled*.\n\n` +
         `We are sorry for any inconvenience caused. Please feel free to contact us or make a new booking at your convenience.\n\n` +
         `Thank you for your understanding.`
       )
-      const waUrl = phone
-        ? `https://wa.me/${phone.startsWith('+') ? phone.slice(1) : phone}?text=${text}`
-        : `https://wa.me/?text=${text}`
-      window.open(waUrl, '_blank')
 
       setCancelBookingModal({ show: false, bookingId: null, bookingRef: '', customerName: '', customerPhone: '', vehicleName: '' })
       reloadData()
@@ -1274,17 +1339,7 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking 
         </thead>
         <tbody>
           {bookings.length ? bookings.map(booking => {
-            const phone = booking.customer?.phone ? booking.customer.phone.replace(/[^0-9+]/g, '') : ''
-            const text = encodeURIComponent(
-              `Hello *${booking.customer?.fullName || 'Customer'}*!\n\n` +
-              `Your booking *${booking.bookingReference}* for *${booking.vehiclePackage?.make || ''} ${booking.vehiclePackage?.model || 'Vehicle'}* is *CONFIRMED*!\n\n` +
-              `Total Amount: Rs. ${booking.totalPrice?.toLocaleString()}\n` +
-              `Return Date: ${new Date(booking.returnDateTime).toLocaleDateString()}\n\n` +
-              `Thank you for choosing our Rental Service!`
-            )
-            const waUrl = phone 
-              ? `https://wa.me/${phone.startsWith('+') ? phone.slice(1) : phone}?text=${text}`
-              : `https://wa.me/?text=${text}`
+            const waUrl = buildWhatsAppUrl(booking.customer?.phone, buildBookingConfirmationMessage(booking))
 
             return (
               <tr key={booking.id} style={{ borderTop: '1px solid #f1f3f5' }}>
@@ -1308,7 +1363,7 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       {booking.status === 'PENDING' && (
                         <button
-                          onClick={() => onStatusChange(booking.id, 'CONFIRMED')}
+                          onClick={() => onStatusChange(booking, 'CONFIRMED')}
                           style={{
                             background: '#00c472',
                             color: '#fff',

@@ -4,12 +4,25 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
+
+const adminPanelLinkStyle = (active) => ({
+  background: active ? '#00a85a' : '#00c472',
+  color: '#fff',
+  borderRadius: 8,
+  padding: '8px 16px',
+  fontSize: 14,
+  fontWeight: 700,
+  textDecoration: 'none',
+})
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
+  const isStaffUser = user && STAFF_ROLES.includes(user.role)
+  const isAdminRoute = location.pathname.startsWith('/admin')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
@@ -57,9 +70,15 @@ export default function Layout() {
           </Link>
 
           <nav className="hidden md:flex items-center gap-6">
-            <a href="#destinations" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</a>
-            <a href="#how-it-works" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</a>
-            <a href="#contact" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</a>
+            {isStaffUser ? (
+              <Link to="/admin" style={adminPanelLinkStyle(isAdminRoute)}>Admin Panel</Link>
+            ) : (
+              <>
+                <a href="#destinations" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</a>
+                <a href="#how-it-works" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</a>
+                <a href="#contact" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</a>
+              </>
+            )}
             {user ? (
               <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button
@@ -81,17 +100,6 @@ export default function Layout() {
                     background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
                     border: '1px solid #e8e8e8', minWidth: 180, overflow: 'hidden', zIndex: 100,
                   }}>
-                    {user.role !== 'CUSTOMER' && (
-                      <Link
-                        to="/admin"
-                        onClick={closeUserMenu}
-                        style={{ display: 'block', padding: '11px 18px', fontSize: 14, color: '#1a1a2e', textDecoration: 'none', fontWeight: 600, borderBottom: '1px solid #f3f4f6' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f5f7fa'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                      >
-                        Admin Panel
-                      </Link>
-                    )}
                     {user.role === 'CUSTOMER' && (
                       <Link
                         to="/my-bookings"
@@ -130,10 +138,15 @@ export default function Layout() {
           </button>
         </div>
         {mobileOpen && <nav className="mobile-menu" aria-label="Mobile navigation">
-          <a href="/#destinations" onClick={closeMobileMenu}>Destinations</a>
-          <a href="/#how-it-works" onClick={closeMobileMenu}>How It Works</a>
-          <a href="/#contact" onClick={closeMobileMenu}>Contact</a>
-          {user?.role !== 'CUSTOMER' && <Link to="/admin" onClick={closeMobileMenu}>Admin</Link>}
+          {isStaffUser ? (
+            <Link to="/admin" onClick={closeMobileMenu}>Admin Panel</Link>
+          ) : (
+            <>
+              <a href="/#destinations" onClick={closeMobileMenu}>Destinations</a>
+              <a href="/#how-it-works" onClick={closeMobileMenu}>How It Works</a>
+              <a href="/#contact" onClick={closeMobileMenu}>Contact</a>
+            </>
+          )}
           {user ? <>{user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}<button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
         </nav>}
       </header>
