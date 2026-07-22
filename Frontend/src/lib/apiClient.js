@@ -4,7 +4,7 @@ async function apiFetch(path, options = {}) {
   const token = localStorage.getItem('token')
 
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
     ...options.headers,
   }
 

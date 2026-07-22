@@ -1,8 +1,11 @@
 // Frontend/src/pages/Home.jsx
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import apiFetch from '../lib/apiClient'
 import LocationAutocomplete from '../components/LocationAutocomplete'
+import IOSDropdown from '../components/IOSDropdown'
+import CustomDateTimePicker from '../components/CustomDateTimePicker'
 
 const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
 const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, and reliable'
@@ -70,6 +73,7 @@ const TRUST_POINTS = [
 
 export default function Home() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const heroRef = useRef(null)
 
   // Trip Type: within city vs out of city
@@ -147,6 +151,35 @@ export default function Home() {
         setValidationError('Please select an outlet location.')
         return
       }
+    }
+
+    if (!pickupTime) {
+      setValidationError('Please select a pickup date and time.')
+      return
+    }
+
+    if (!returnTime) {
+      setValidationError('Please select a return date and time.')
+      return
+    }
+
+    const pickupDate = new Date(pickupTime)
+    const returnDate = new Date(returnTime)
+    const now = new Date()
+
+    if (isNaN(pickupDate.getTime())) {
+      setValidationError('Please enter a valid pickup date and time.')
+      return
+    }
+
+    if (isNaN(returnDate.getTime())) {
+      setValidationError('Please enter a valid return date and time.')
+      return
+    }
+
+    if (returnDate <= pickupDate) {
+      setValidationError('Return date and time must be after the pickup date and time.')
+      return
     }
 
     const selectedOutlet = outlets.find((o) => o.id === Number(selectedOutletId))
@@ -313,51 +346,54 @@ export default function Home() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>
                     Pick Branch / Outlet Location (Self-Drive)
                   </label>
-                  <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                  <div style={{ marginTop: 6 }}>
                     {loadingOutlets ? (
-                      <p style={{ margin: 0, fontSize: 14, color: '#888' }}>Loading branch locations...</p>
+                      <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px' }}>
+                        <p style={{ margin: 0, fontSize: 14, color: '#888' }}>Loading branch locations...</p>
+                      </div>
                     ) : outletError ? (
-                      <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>{outletError}</p>
+                      <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px' }}>
+                        <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>{outletError}</p>
+                      </div>
                     ) : outlets.length === 0 ? (
-                      <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>No outlets configured for this agency yet. Please contact support.</p>
+                      <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px' }}>
+                        <p style={{ margin: 0, fontSize: 14, color: '#c53030' }}>No outlets configured for this agency yet. Please contact support.</p>
+                      </div>
                     ) : (
-                      <select
+                      <IOSDropdown
                         value={selectedOutletId}
                         onChange={(e) => setSelectedOutletId(e.target.value)}
-                        style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
-                      >
-                        {outlets.map((outlet) => (
-                          <option key={outlet.id} value={outlet.id}>
-                            {outlet.city} — {outlet.name} ({outlet.addressText})
-                          </option>
-                        ))}
-                      </select>
+                        label="Select Branch / Outlet"
+                        options={outlets.map((outlet) => ({
+                          value: String(outlet.id),
+                          label: `${outlet.city} — ${outlet.name} (${outlet.addressText})`
+                        }))}
+                        style={{ width: '100%' }}
+                      />
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Datetime Pickers */}
+              {/* Custom Datetime Pickers */}
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Pickup Date and Time</label>
-                <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
-                  <input
-                    type="datetime-local"
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Pickup Date and Time *</label>
+                <div style={{ marginTop: 6 }}>
+                  <CustomDateTimePicker
                     value={pickupTime}
-                    onChange={e => setPickupTime(e.target.value)}
-                    style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
+                    min={new Date().toISOString().slice(0, 16)}
+                    onChange={val => setPickupTime(val)}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Return Date and Time</label>
-                <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
-                  <input
-                    type="datetime-local"
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Return Date and Time *</label>
+                <div style={{ marginTop: 6 }}>
+                  <CustomDateTimePicker
                     value={returnTime}
-                    onChange={e => setReturnTime(e.target.value)}
-                    style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333', background: 'transparent' }}
+                    min={pickupTime || new Date().toISOString().slice(0, 16)}
+                    onChange={val => setReturnTime(val)}
                   />
                 </div>
               </div>
@@ -384,22 +420,58 @@ export default function Home() {
               </p>
             )}
 
-            <button
-              className="search-cta"
-              style={{
-                background: 'linear-gradient(90deg, #00c472, #00a85a)',
-                color: '#fff', border: 'none', borderRadius: 12,
-                padding: '14px 48px', fontWeight: 800, fontSize: 15,
-                cursor: 'pointer', width: '100%', letterSpacing: 0.5,
-                boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
-              onClick={handleSearch}
-            >
-              Search Available Cars
-            </button>
+            {user && ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(user.role) ? (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  className="search-cta"
+                  style={{
+                    background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                    color: '#fff', border: 'none', borderRadius: 12,
+                    padding: '14px 20px', fontWeight: 800, fontSize: 15,
+                    cursor: 'pointer', flex: 1, letterSpacing: 0.5,
+                    boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
+                  onClick={handleSearch}
+                >
+                  Search Available Cars
+                </button>
+                <button
+                  style={{
+                    background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                    color: '#fff', border: 'none', borderRadius: 12,
+                    padding: '14px 20px', fontWeight: 800, fontSize: 15,
+                    cursor: 'pointer', flex: 1, letterSpacing: 0.5,
+                    boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
+                  onClick={() => navigate('/search', { state: {} })}
+                >
+                  View Cars
+                </button>
+              </div>
+            ) : (
+              <button
+                className="search-cta"
+                style={{
+                  background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                  color: '#fff', border: 'none', borderRadius: 12,
+                  padding: '14px 48px', fontWeight: 800, fontSize: 15,
+                  cursor: 'pointer', width: '100%', letterSpacing: 0.5,
+                  boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)' }}
+                onClick={handleSearch}
+              >
+                Search Available Cars
+              </button>
+            )}
           </div>
 
         </div>

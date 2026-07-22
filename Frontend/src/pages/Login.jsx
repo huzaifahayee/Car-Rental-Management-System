@@ -35,7 +35,7 @@ export default function Login() {
         body: JSON.stringify({ email: normalizedEmail, password }),
       })
       login(data.token, data.user)
-      navigate(data.user.role === 'ADMIN' || data.user.role === 'EMPLOYEE' ? '/admin' : '/')
+      navigate('/')
     } catch (err) {
       setError(err.message)
     }

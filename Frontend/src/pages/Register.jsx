@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
-import { isValidEmail, isValidPhone, passwordError } from '../lib/validation'
+import { isValidEmail, phoneError, passwordError } from '../lib/validation'
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
@@ -29,8 +29,8 @@ export default function Register() {
     else if (normalizedName.length < 2 || normalizedName.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(normalizedName)) errors.fullName = 'Use letters, spaces, apostrophes, or hyphens only.'
     if (!normalizedEmail) errors.email = 'Email is required.'
     else if (!isValidEmail(normalizedEmail)) errors.email = 'Enter a valid email address.'
-    if (!phone) errors.phone = 'Phone number is required.'
-    else if (!isValidPhone(phone)) errors.phone = 'Use 10–15 digits; a phone number cannot be negative.'
+    const phoneErr = phoneError(phone)
+    if (phoneErr) errors.phone = phoneErr
     const invalidPassword = passwordError(password)
     if (!password) errors.password = 'Password is required.'
     else if (invalidPassword) errors.password = invalidPassword

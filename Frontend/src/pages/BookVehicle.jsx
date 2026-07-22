@@ -1,14 +1,30 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
+import IOSDropdown from '../components/IOSDropdown'
+import CustomDateTimePicker from '../components/CustomDateTimePicker'
+
+const SESSION_KEY = 'bookVehicleSearchState'
 
 export default function BookVehicle() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
-  const searchState = location.state || {}
+
+  // Use location.state if available, otherwise fall back to sessionStorage so
+  // that returning from "Back to vehicles" doesn't lose the search context.
+  const searchState = location.state && Object.keys(location.state).length > 0
+    ? location.state
+    : (() => { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || '{}') } catch { return {} } })()
+
+  // Persist the search state whenever we have a real one
+  const savedRef = useRef(false)
+  if (!savedRef.current && location.state && Object.keys(location.state).length > 0) {
+    savedRef.current = true
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(location.state)) } catch {}
+  }
 
   const { user } = useAuth()
   const [vehicle, setVehicle] = useState(null)
@@ -127,14 +143,22 @@ export default function BookVehicle() {
   return (
     <div style={{ background: '#f5f7fa', minHeight: '100vh', padding: '48px 16px' }}>
       <div className="max-w-4xl mx-auto">
-        <Link to="/search" style={{ color: '#00a85a', fontWeight: 700, textDecoration: 'none', fontSize: 14 }}>
+        <button
+          onClick={() => navigate(-1)}
+          style={{ background: 'none', border: 'none', color: '#00a85a', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: 0 }}
+        >
           ← Back to vehicles
-        </Link>
+        </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ marginTop: 18 }}>
           {/* Selected Vehicle Info */}
           <section style={cardStyle}>
             <p style={eyebrow}>Selected vehicle</p>
             <h1 style={{ margin: '0 0 10px', color: '#1a1a2e', fontSize: 26 }}>{vehicle.make} {vehicle.model}</h1>
+            {vehicle.imageUrls?.[0] && (
+              <div style={{ height: 180, borderRadius: 12, overflow: 'hidden', marginBottom: 16 }}>
+                <img src={vehicle.imageUrls[0]} alt={`${vehicle.make} ${vehicle.model}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            )}
             <p style={{ color: '#667085', lineHeight: 1.6 }}>
               {vehicle.category} · {vehicle.seatingCapacity} seats · {vehicle.transmission.toLowerCase()} · {vehicle.hasAC ? 'Air conditioned' : 'No AC'}
             </p>
@@ -161,25 +185,26 @@ export default function BookVehicle() {
               </>
             ) : (
               <form onSubmit={submitBooking} style={{ display: 'grid', gap: 15 }}>
-                {/* Rental Mode Selector */}
+                {/* Rental Mode (Fixed from Search Selection) */}
                 <Field label="Rental Mode">
-                  <div className="flex gap-4 mt-1">
-                    {[
-                      { mode: 'WITH_DRIVER', label: 'With-Driver' },
-                      { mode: 'SELF_DRIVE', label: 'Self-Drive' },
-                    ].map(({ mode, label: modeLabel }) => (
-                      <label key={mode} className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="rentalMode"
-                          value={mode}
-                          checked={rentalMode === mode}
-                          onChange={() => setRentalMode(mode)}
-                          accentColor="#00c472"
-                        />
-                        <span style={{ fontSize: 13, fontWeight: 600, color: '#333' }}>{modeLabel}</span>
-                      </label>
-                    ))}
+                  <div style={{ marginTop: 4 }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: '#e8faf2',
+                        color: '#00a85a',
+                        border: '1.5px solid #00c472',
+                        borderRadius: 8,
+                        padding: '6px 14px',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      ✓ {rentalMode === 'WITH_DRIVER' ? 'With-Driver Rental' : 'Self-Drive (Without Driver)'}
+                    </span>
                   </div>
                 </Field>
 
@@ -218,56 +243,53 @@ export default function BookVehicle() {
                   </>
                 ) : (
                   <Field label="Pickup Outlet / Branch">
-                    <div style={inputContainerStyle}>
-                      {loadingOutlets ? (
-                        <p style={{ margin: 0, fontSize: 13, color: '#888' }}>Loading outlets...</p>
-                      ) : (
-                        <select
-                          value={outletId}
-                          onChange={(e) => setOutletId(e.target.value)}
-                          style={{ border: 'none', outline: 'none', width: '100%', fontSize: 14, color: '#333' }}
-                        >
-                          {outlets.map((o) => (
-                            <option key={o.id} value={o.id}>
-                              {o.city} — {o.name} ({o.addressText})
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
+                    {loadingOutlets ? (
+                      <p style={{ margin: 0, fontSize: 13, color: '#888' }}>Loading outlets...</p>
+                    ) : (
+                      <IOSDropdown
+                        value={outletId}
+                        onChange={(e) => setOutletId(e.target.value)}
+                        label="Pickup Outlet / Branch"
+                        options={outlets.map((o) => ({
+                          value: String(o.id),
+                          label: `${o.city} — ${o.name} (${o.addressText})`
+                        }))}
+                        style={{ width: '100%' }}
+                      />
+                    )}
                   </Field>
                 )}
 
                 {/* Dates */}
                 <Field label="Pickup date and time">
-                  <input
-                    type="datetime-local"
+                  <CustomDateTimePicker
                     value={pickupDateTime}
                     min={new Date().toISOString().slice(0, 16)}
-                    onChange={e => setPickupDateTime(e.target.value)}
-                    required
-                    style={inputStyle}
+                    onChange={val => setPickupDateTime(val)}
                   />
                 </Field>
 
                 <Field label="Return date and time">
-                  <input
-                    type="datetime-local"
+                  <CustomDateTimePicker
                     value={returnDateTime}
                     min={pickupDateTime || new Date().toISOString().slice(0, 16)}
-                    onChange={e => setReturnDateTime(e.target.value)}
-                    required
-                    style={inputStyle}
+                    onChange={val => setReturnDateTime(val)}
                   />
                 </Field>
 
                 {/* Payment */}
                 <Field label="Payment method">
-                  <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} style={inputStyle}>
-                    <option value="CASH">Cash on pickup</option>
-                    <option value="BANK_TRANSFER">Bank transfer</option>
-                    <option value="CARD">Card</option>
-                  </select>
+                  <IOSDropdown
+                    value={paymentMethod}
+                    onChange={e => setPaymentMethod(e.target.value)}
+                    label="Payment Method"
+                    options={[
+                      { value: 'CASH', label: 'Cash on pickup' },
+                      { value: 'BANK_TRANSFER', label: 'Bank transfer' },
+                      { value: 'CARD', label: 'Card' }
+                    ]}
+                    style={{ width: '100%' }}
+                  />
                 </Field>
 
                 <Field label="Payment reference (optional)">

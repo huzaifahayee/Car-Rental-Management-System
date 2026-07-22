@@ -6,6 +6,6 @@ const router = express.Router()
 
 router.post('/', authenticate, authorize('CUSTOMER'), createBooking)
 router.get('/', authenticate, getBookings)
-router.put('/:id/status', authenticate, authorize('ADMIN', 'EMPLOYEE'), updateBookingStatus)
+router.put('/:id/status', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), updateBookingStatus)
 
 module.exports = router

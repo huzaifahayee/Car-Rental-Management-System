@@ -7,6 +7,7 @@ const vehicleRoutes = require("./routes/vehicles")
 const bookingRoutes = require("./routes/bookings")
 const dashboardRoutes = require("./routes/dashboard.js")
 const outletRoutes = require("./routes/outlets")
+const userRoutes = require("./routes/users")
 const cors = require("cors")
 
 const app = express()
@@ -20,6 +21,7 @@ app.use("/vehicles", vehicleRoutes)
 app.use("/bookings", bookingRoutes)
 app.use("/dashboard", dashboardRoutes)
 app.use("/outlets", outletRoutes)
+app.use("/users", userRoutes)
 
 async function startServer() {
   try {

@@ -3,8 +3,25 @@ export function isValidEmail(value) {
 }
 
 export function isValidPhone(value) {
-  const compact = value.replace(/[\s()-]/g, '')
-  return !value.trim().startsWith('-') && /^\+?[1-9]\d{9,14}$/.test(compact)
+  if (!value || typeof value !== 'string') return false
+  const stripped = value.replace(/[\s()\-]/g, '') // remove spaces, parens, dashes
+
+  // Reject negatives or anything starting with minus
+  if (stripped.startsWith('-')) return false
+
+  // Pakistani mobile: 03XXXXXXXXX (11 digits, starts with 03)
+  if (/^03\d{9}$/.test(stripped)) return true
+
+  // Pakistani with country code: +923XXXXXXXXX or 923XXXXXXXXX (12–13 chars)
+  if (/^(\+92|92)3\d{9}$/.test(stripped)) return true
+
+  return false
+}
+
+export function phoneError(value) {
+  if (!value || !value.trim()) return 'Phone number is required.'
+  if (!isValidPhone(value)) return 'Enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).'
+  return ''
 }
 
 export function passwordError(value) {

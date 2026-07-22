@@ -38,13 +38,25 @@ async function getVehicleById(req, res) {
 }
 
 async function createVehicle(req, res) {
-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity } = req.body
+  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrls } = req.body
   if (!category || !make || !model || !seatingCapacity || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
     return res.status(400).json({ error: 'Missing required vehicle fields.' })
   }
   try {
     const vehicle = await req.prisma.vehiclePackage.create({
-      data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity },
+      data: {
+        category,
+        make,
+        model,
+        seatingCapacity,
+        transmission,
+        hasAC,
+        driverOption,
+        pricePerDay,
+        pickupCity,
+        dropoffCity,
+        imageUrls: Array.isArray(imageUrls) ? imageUrls : [],
+      },
     })
     res.status(201).json(vehicle)
   } catch (err) {
@@ -53,11 +65,15 @@ async function createVehicle(req, res) {
 }
 
 async function updateVehicle(req, res) {
-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status } = req.body
+  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
   try {
+    const updateData = { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status }
+    if (Array.isArray(imageUrls)) {
+      updateData.imageUrls = imageUrls
+    }
     const vehicle = await req.prisma.vehiclePackage.update({
       where: { id: Number(req.params.id) },
-      data: { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status },
+      data: updateData,
     })
     res.json(vehicle)
   } catch (err) {

@@ -158,7 +158,13 @@ async function updateBookingStatus(req, res) {
 
   try {
     const booking = await req.prisma.booking.update({
-      where: { id: Number(req.params.id) }, data: { status },
+      where: { id: Number(req.params.id) },
+      data: { status },
+      include: {
+        customer: { select: { id: true, fullName: true, email: true, phone: true } },
+        vehiclePackage: true,
+        outlet: true,
+      },
     })
     res.json(booking)
   } catch (err) {

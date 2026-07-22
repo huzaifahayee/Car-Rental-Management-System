@@ -12,8 +12,8 @@ const router = express.Router()
 
 router.get('/', getOutlets)
 router.get('/:id', getOutletById)
-router.post('/', authenticate, authorize('ADMIN', 'EMPLOYEE'), createOutlet)
-router.put('/:id', authenticate, authorize('ADMIN', 'EMPLOYEE'), updateOutlet)
-router.delete('/:id', authenticate, authorize('ADMIN', 'EMPLOYEE'), deleteOutlet)
+router.post('/', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), createOutlet)
+router.put('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), updateOutlet)
+router.delete('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), deleteOutlet)
 
 module.exports = router

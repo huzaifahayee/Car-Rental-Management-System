@@ -1,5 +1,5 @@
 // Frontend/src/components/Layout.jsx
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -11,27 +11,42 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef(null)
+
   const closeMobileMenu = () => setMobileOpen(false)
-  function signOut() { logout(); closeMobileMenu(); navigate('/') }
+  const closeUserMenu = () => setUserMenuOpen(false)
+
+  function signOut() {
+    logout()
+    closeUserMenu()
+    closeMobileMenu()
+    navigate('/')
+  }
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        closeUserMenu()
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Close user menu on route change
+  useEffect(() => {
+    closeUserMenu()
+    closeMobileMenu()
+  }, [location.pathname])
 
   return (
     <div style={{ fontFamily: "'Inter', 'Nunito', sans-serif", background: '#f5f7fa', minHeight: '100vh' }}>
 
-      {!isAuthPage && (
-        <div style={{ background: '#1a1a2e', color: '#9ca3af', fontSize: 13 }}>
-          <div className="max-w-7xl mx-auto px-6 py-2 flex justify-between items-center">
-            <span style={{ color: '#00c472', fontWeight: 600 }}>Multi-tenant car rental & hotel booking</span>
-            <div className="flex gap-4 items-center">
-              <button style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 13 }}>English</button>
-              {user ? <button onClick={signOut} style={{ background: '#00c472', color: '#fff', border: 0, borderRadius: 6, padding: '4px 14px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Logout</button> : <Link to="/login" style={{ background: '#00c472', color: '#fff', borderRadius: 6, padding: '4px 14px', fontWeight: 600, fontSize: 13, textDecoration: 'none' }}>Login / Sign Up</Link>}
-            </div>
-          </div>
-        </div>
-      )}
-
       <header style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', position: 'sticky', top: 0, zIndex: 50 }}>
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between py-4">
-          <Link to="/" onClick={closeMobileMenu} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="w-full px-6 md:px-10 flex items-center justify-between py-4">
+          <Link to="/" onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ background: '#00c472', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>G</span>
             </div>
@@ -45,8 +60,70 @@ export default function Layout() {
             <a href="#destinations" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</a>
             <a href="#how-it-works" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</a>
             <a href="#contact" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</a>
-            {user?.role !== 'CUSTOMER' && <Link to="/admin" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Admin</Link>}
-            {user ? <details className="user-menu"><summary>{user.fullName}</summary><div><Link to="/my-bookings">My Bookings</Link><button onClick={signOut}>Logout</button></div></details> : <><Link to="/login" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Login</Link><Link to="/register" style={{ background: '#00c472', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Register</Link></>}
+            {user ? (
+              <div ref={userMenuRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setUserMenuOpen(open => !open)}
+                  style={{
+                    background: 'none', border: '1.5px solid #e0e0e0', borderRadius: 8,
+                    padding: '7px 14px', cursor: 'pointer', fontWeight: 700, fontSize: 14,
+                    color: '#1a1a2e', display: 'flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  {user.fullName}
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: userMenuOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }}>
+                    <path d="M2 4l4 4 4-4" stroke="#888" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                {userMenuOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0,
+                    background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                    border: '1px solid #e8e8e8', minWidth: 180, overflow: 'hidden', zIndex: 100,
+                  }}>
+                    {user.role !== 'CUSTOMER' && (
+                      <Link
+                        to="/admin"
+                        onClick={closeUserMenu}
+                        style={{ display: 'block', padding: '11px 18px', fontSize: 14, color: '#1a1a2e', textDecoration: 'none', fontWeight: 600, borderBottom: '1px solid #f3f4f6' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f7fa'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        Admin Panel
+                      </Link>
+                    )}
+                    {user.role === 'CUSTOMER' && (
+                      <Link
+                        to="/my-bookings"
+                        onClick={closeUserMenu}
+                        style={{ display: 'block', padding: '11px 18px', fontSize: 14, color: '#1a1a2e', textDecoration: 'none', fontWeight: 500 }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f7fa'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        My Bookings
+                      </Link>
+                    )}
+                    <button
+                      onClick={signOut}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '11px 18px', fontSize: 14,
+                        color: '#dc2626', fontWeight: 600, background: 'none', border: 'none',
+                        cursor: 'pointer', borderTop: '1px solid #f3f4f6',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <Link to="/login" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Login</Link>
+                <Link to="/register" style={{ background: '#00c472', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Register</Link>
+              </>
+            )}
           </nav>
           <button className="mobile-menu-button" type="button" aria-label="Toggle navigation menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen(open => !open)}>
             <span /><span /><span />
@@ -57,7 +134,7 @@ export default function Layout() {
           <a href="/#how-it-works" onClick={closeMobileMenu}>How It Works</a>
           <a href="/#contact" onClick={closeMobileMenu}>Contact</a>
           {user?.role !== 'CUSTOMER' && <Link to="/admin" onClick={closeMobileMenu}>Admin</Link>}
-          {user ? <><Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link><button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
+          {user ? <>{user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}<button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
         </nav>}
       </header>
 
