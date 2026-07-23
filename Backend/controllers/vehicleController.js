@@ -1,4 +1,24 @@
+async function reconcileVehicleStatuses(req, res, next) {
+  try {
+    const confirmedBookings = await req.prisma.booking.findMany({
+      where: { status: 'CONFIRMED' },
+      select: { vehiclePackageId: true },
+    })
+
+    const confirmedVehicleIds = [...new Set(confirmedBookings.map((booking) => booking.vehiclePackageId))]
+
+    await req.prisma.vehiclePackage.updateMany({
+      where: { id: { in: confirmedVehicleIds }, status: 'AVAILABLE' },
+      data: { status: 'BOOKED' },
+    })
+  } catch (err) {
+    console.error('Failed to reconcile vehicle statuses:', err.message)
+  }
+  next()
+}
+
 async function getVehicles(req, res) {
+  await reconcileVehicleStatuses(req, res, () => {})
   const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status, sort } = req.query
 
   const where = {}

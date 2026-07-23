@@ -8,7 +8,51 @@ function generateBookingReference() {
 const VALID_RENTAL_MODES = ['WITH_DRIVER', 'SELF_DRIVE']
 const ADDRESS_MAX_LENGTH = 255
 
+function getVehicleStatusForBookingStatus(status, booking) {
+  const now = new Date()
+  if (status === 'COMPLETED') return 'AVAILABLE'
+  if (status === 'CANCELLED') {
+    const pickup = new Date(booking.pickupDateTime)
+    const returnTime = new Date(booking.returnDateTime)
+    if (now < pickup || now >= returnTime) return 'AVAILABLE'
+    return 'BOOKED'
+  }
+  return 'BOOKED'
+}
+
+async function reconcileOverdueBookings(prisma) {
+  const now = new Date()
+  const overdueConfirmedBookings = await prisma.booking.findMany({
+    where: {
+      status: 'CONFIRMED',
+      returnDateTime: { lte: now },
+    },
+    select: {
+      id: true,
+      vehiclePackageId: true,
+    },
+  })
+
+  if (!overdueConfirmedBookings.length) return
+
+  const bookingIds = overdueConfirmedBookings.map((booking) => booking.id)
+  const vehicleIds = [...new Set(overdueConfirmedBookings.map((booking) => booking.vehiclePackageId))]
+
+  await prisma.$transaction([
+    prisma.booking.updateMany({
+      where: { id: { in: bookingIds } },
+      data: { status: 'COMPLETED' },
+    }),
+    prisma.vehiclePackage.updateMany({
+      where: { id: { in: vehicleIds } },
+      data: { status: 'AVAILABLE' },
+    }),
+  ])
+}
+
 async function createBooking(req, res) {
+  await reconcileOverdueBookings(req.prisma)
+
   const {
     vehiclePackageId, pickupDateTime, returnDateTime,
     paymentMethod, paymentReference,
@@ -133,6 +177,7 @@ async function createBooking(req, res) {
 
 async function getBookings(req, res) {
   try {
+    await reconcileOverdueBookings(req.prisma)
     const where = req.user.role === 'CUSTOMER' ? { customerId: req.user.userId } : {}
     const bookings = await req.prisma.booking.findMany({
       where,
@@ -157,10 +202,11 @@ async function updateBookingStatus(req, res) {
   }
 
   try {
+    await reconcileOverdueBookings(req.prisma)
     const booking = await req.prisma.booking.findUnique({ where: { id: Number(req.params.id) } })
     if (!booking) return res.status(404).json({ error: 'Booking not found.' })
 
-    const vehicleStatus = status === 'CONFIRMED' ? 'BOOKED' : 'AVAILABLE'
+    const vehicleStatus = getVehicleStatusForBookingStatus(status, booking)
     const [updatedBooking] = await req.prisma.$transaction([
       req.prisma.booking.update({
         where: { id: Number(req.params.id) },
@@ -185,6 +231,7 @@ async function updateBookingStatus(req, res) {
 
 async function cancelBooking(req, res) {
   try {
+    await reconcileOverdueBookings(req.prisma)
     const id = Number(req.params.id)
     const booking = await req.prisma.booking.findUnique({ where: { id } })
     if (!booking) return res.status(404).json({ error: 'Booking not found.' })
@@ -198,6 +245,7 @@ async function cancelBooking(req, res) {
       return res.status(400).json({ error: `Cannot cancel a booking with status ${booking.status}.` })
     }
 
+    const vehicleStatus = getVehicleStatusForBookingStatus('CANCELLED', booking)
     const [updated] = await req.prisma.$transaction([
       req.prisma.booking.update({
         where: { id },
@@ -210,7 +258,7 @@ async function cancelBooking(req, res) {
       }),
       req.prisma.vehiclePackage.update({
         where: { id: booking.vehiclePackageId },
-        data: { status: 'AVAILABLE' },
+        data: { status: vehicleStatus },
       }),
     ])
 

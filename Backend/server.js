@@ -31,6 +31,30 @@ async function startServer() {
     const prisma = tenantResolver.getPrismaClientForTenant('default')
     await prisma.$connect()
     console.log('Connected to PostgreSQL successfully')
+
+    // Periodically reconcile overdue bookings so vehicles are released after their return time.
+    setInterval(async () => {
+      try {
+        const now = new Date()
+        const overdueConfirmedBookings = await prisma.booking.findMany({
+          where: { status: 'CONFIRMED', returnDateTime: { lte: now } },
+          select: { id: true, vehiclePackageId: true },
+        })
+        if (!overdueConfirmedBookings.length) return
+
+        const bookingIds = overdueConfirmedBookings.map((booking) => booking.id)
+        const vehicleIds = [...new Set(overdueConfirmedBookings.map((booking) => booking.vehiclePackageId))]
+
+        await prisma.$transaction([
+          prisma.booking.updateMany({ where: { id: { in: bookingIds } }, data: { status: 'COMPLETED' } }),
+          prisma.vehiclePackage.updateMany({ where: { id: { in: vehicleIds } }, data: { status: 'AVAILABLE' } }),
+        ])
+
+        console.log(`Reconciled ${bookingIds.length} overdue booking(s) at ${now.toISOString()}`)
+      } catch (reconcileErr) {
+        console.error('Failed to reconcile overdue bookings:', reconcileErr.message)
+      }
+    }, 1000 * 60 * 5)
   } catch (err) {
     console.error('Failed to connect to PostgreSQL:', err.message)
     process.exit(1)
