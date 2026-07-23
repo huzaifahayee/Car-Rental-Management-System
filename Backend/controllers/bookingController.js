@@ -172,4 +172,53 @@ async function updateBookingStatus(req, res) {
   }
 }
 
-module.exports = { createBooking, getBookings, updateBookingStatus }
+async function cancelBooking(req, res) {
+  try {
+    const id = Number(req.params.id)
+    const booking = await req.prisma.booking.findUnique({ where: { id } })
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' })
+
+    // Only the owning customer may cancel their booking via this endpoint
+    if (booking.customerId !== req.user.userId) {
+      return res.status(403).json({ error: 'You do not have permission to cancel this booking.' })
+    }
+
+    if (['CANCELLED', 'COMPLETED'].includes(booking.status)) {
+      return res.status(400).json({ error: `Cannot cancel a booking with status ${booking.status}.` })
+    }
+
+    const updated = await req.prisma.booking.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+      include: {
+        customer: { select: { id: true, fullName: true, email: true, phone: true } },
+        vehiclePackage: true,
+        outlet: true,
+      },
+    })
+
+    res.json(updated)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to cancel booking', details: err.message })
+  }
+}
+
+async function deleteBooking(req, res) {
+  try {
+    const id = Number(req.params.id)
+    const booking = await req.prisma.booking.findUnique({ where: { id } })
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' })
+
+    // Only allow deletion of bookings that are CANCELLED
+    if (booking.status !== 'CANCELLED') {
+      return res.status(400).json({ error: 'Only bookings with status CANCELLED can be deleted.' })
+    }
+
+    await req.prisma.booking.delete({ where: { id } })
+    res.json({ success: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete booking', details: err.message })
+  }
+}
+
+module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking }

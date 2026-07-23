@@ -88,15 +88,16 @@ function buildBookingConfirmationMessage(booking, { approved = false } = {}) {
 }
 
 function openWhatsApp(phone, message) {
-  window.open(buildWhatsAppUrl(phone, message), '_blank')
+  const url = buildWhatsAppUrl(phone, message)
+  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function buildWhatsAppUrl(phone, message) {
   const cleaned = phone ? phone.replace(/[^0-9+]/g, '') : ''
-  const text = encodeURIComponent(message)
+  const text = encodeURIComponent(message || '')
   return cleaned
-    ? `https://wa.me/${cleaned.startsWith('+') ? cleaned.slice(1) : cleaned}?text=${text}`
-    : `https://wa.me/?text=${text}`
+    ? `https://api.whatsapp.com/send?phone=${cleaned.startsWith('+') ? cleaned.slice(1) : cleaned}&text=${text}`
+    : `https://api.whatsapp.com/send?text=${text}`
 }
 
 export default function AdminPanel() {
@@ -362,24 +363,24 @@ export default function AdminPanel() {
   }
 
   // ---- Update Booking Status & WhatsApp Confirmation ----
-  async function handleUpdateBookingStatus(booking, newStatus) {
+  async function handleUpdateBookingStatus(bookingId, newStatus) {
     try {
-      const updatedBooking = await apiFetch(`/bookings/${booking.id}/status`, {
+      await apiFetch(`/bookings/${bookingId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus }),
       })
-
-      if (newStatus === 'CONFIRMED') {
-        openWhatsApp(
-          booking.customer?.phone,
-          buildBookingConfirmationMessage(booking, { approved: true })
-        )
-      }
-
       reloadData()
     } catch (err) {
       alert(`Failed to update booking status: ${err.message}`)
     }
+  }
+
+  function handleApproveBooking(booking) {
+    openWhatsApp(
+      booking.customer?.phone,
+      buildBookingConfirmationMessage(booking, { approved: true })
+    )
+    handleUpdateBookingStatus(booking.id, 'CONFIRMED')
   }
 
   // ---- Cancel Booking (with confirmation modal) ----
@@ -445,6 +446,36 @@ export default function AdminPanel() {
       setDeleteUserError(err.message)
     } finally {
       setDeletingUser(false)
+    }
+  }
+
+  // ---- Delete Booking (admin only) ----
+  const [deleteBookingModal, setDeleteBookingModal] = useState({ show: false, bookingId: null, bookingRef: '', customerName: '', vehicleName: '' })
+  const [deletingBooking, setDeletingBooking] = useState(false)
+  const [deleteBookingError, setDeleteBookingError] = useState('')
+
+  function handleDeleteBookingInitiate(booking) {
+    setDeleteBookingError('')
+    setDeleteBookingModal({
+      show: true,
+      bookingId: booking.id,
+      bookingRef: booking.bookingReference,
+      customerName: booking.customer?.fullName || 'Customer',
+      vehicleName: `${booking.vehiclePackage?.make || ''} ${booking.vehiclePackage?.model || 'Vehicle'}`.trim(),
+    })
+  }
+
+  async function handleConfirmDeleteBooking() {
+    setDeleteBookingError('')
+    setDeletingBooking(true)
+    try {
+      await apiFetch(`/bookings/${deleteBookingModal.bookingId}`, { method: 'DELETE' })
+      setDeleteBookingModal({ show: false, bookingId: null, bookingRef: '', customerName: '', vehicleName: '' })
+      reloadData()
+    } catch (err) {
+      setDeleteBookingError(err.message)
+    } finally {
+      setDeletingBooking(false)
     }
   }
 
@@ -627,13 +658,13 @@ export default function AdminPanel() {
               <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
               <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
             </div>
-            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleUpdateBookingStatus} onCancelBooking={handleCancelBookingInitiate} compact /></DataCard>
+            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleApproveBooking} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} compact /></DataCard>
             <div style={{ height: 24 }} />
             <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
           </>
         )}
 
-        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleUpdateBookingStatus} onCancelBooking={handleCancelBookingInitiate} /></DataCard>}
+        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleApproveBooking} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} /></DataCard>}
         {tab === 'vehicles' && (
           <DataCard
             title={`All vehicles (${vehicles.length})`}
@@ -1005,6 +1036,56 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Delete Booking Confirmation Modal (Admin only) */}
+      {deleteBookingModal.show && (
+        <div style={{ ...modalOverlayStyle, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+          <div style={{ ...modalCardStyle, maxWidth: 460 }}>
+            <div className="flex justify-between items-center mb-4 pb-3" style={{ borderBottom: '1px solid #e5e7eb' }}>
+              <h2 style={{ margin: 0, fontSize: 18, color: '#dc2626', fontWeight: 800 }}>Clear Cancelled Booking</h2>
+              <button
+                onClick={() => setDeleteBookingModal({ show: false, bookingId: null, bookingRef: '', customerName: '', vehicleName: '' })}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}
+              >×</button>
+            </div>
+
+            <div style={{ margin: '16px 0', fontSize: 14, lineHeight: 1.6, color: '#475467' }}>
+              <p style={{ margin: '0 0 14px' }}>Are you sure you want to permanently remove this cancelled booking from records?</p>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
+                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Reference: </span><span style={{ color: '#00a85a', fontWeight: 700 }}>{deleteBookingModal.bookingRef}</span></div>
+                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Customer: </span>{deleteBookingModal.customerName}</div>
+                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Vehicle: </span>{deleteBookingModal.vehicleName}</div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, background: '#fff7f7', border: '1px solid #fee2e2', padding: '12px 16px', borderRadius: 10 }}>
+                <div>
+                  <span style={{ fontSize: 11, display: 'block', color: '#991b1b', marginBottom: 2, fontWeight: 700, textTransform: 'uppercase' }}>Warning</span>
+                  <span style={{ fontSize: 13, color: '#b91c1c' }}>This action is irreversible. The booking record will be permanently removed.</span>
+                </div>
+              </div>
+            </div>
+
+            {deleteBookingError && <p style={{ color: '#c53030', fontSize: 13, margin: '0 0 14px' }}>{deleteBookingError}</p>}
+
+            <div className="flex justify-end gap-3 mt-4 pt-2" style={{ borderTop: '1px solid #e5e7eb' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteBookingModal({ show: false, bookingId: null, bookingRef: '', customerName: '', vehicleName: '' })}
+                style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingBooking}
+                onClick={handleConfirmDeleteBooking}
+                style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: deletingBooking ? 0.7 : 1 }}
+              >
+                {deletingBooking ? 'Deleting...' : 'Delete Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Vehicle Modal */}
       {showVehicleModal && (
         <div style={modalOverlayStyle}>
@@ -1324,7 +1405,7 @@ function Badge({ value }) {
   )
 }
 
-function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking }) {
+function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking, onDeleteBooking }) {
   const canManage = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(currentUser?.role)
 
   return (
@@ -1414,6 +1495,24 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking 
                           }}
                         >
                           Cancel
+                        </button>
+                      )}
+                      {/* Admin-only: allow clearing (permanent delete) of cancelled bookings */}
+                      {booking.status === 'CANCELLED' && currentUser?.role === 'ADMIN' && (
+                        <button
+                          onClick={() => onDeleteBooking && onDeleteBooking(booking)}
+                          style={{
+                            background: '#ffffff',
+                            color: '#dc2626',
+                            border: '1px solid #fee2e2',
+                            borderRadius: 6,
+                            padding: '4px 8px',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Clear
                         </button>
                       )}
                     </div>

@@ -56,6 +56,7 @@ export default function BookVehicle() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [booking, setBooking] = useState(null)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   useEffect(() => {
     apiFetch(`/vehicles/${id}`)
@@ -79,8 +80,8 @@ export default function BookVehicle() {
     }
   }, [rentalMode, outlets.length, outletId])
 
-  async function submitBooking(event) {
-    event.preventDefault()
+  // Prepare and send booking payload to API
+  async function doCreateBooking() {
     if (!user) return navigate('/login')
     if (user.role !== 'CUSTOMER') return setError('Bookings can only be created from a customer account.')
 
@@ -88,15 +89,10 @@ export default function BookVehicle() {
     if (new Date(pickupDateTime) < new Date()) return setError('Pickup date and time cannot be in the past.')
     if (new Date(returnDateTime) <= new Date(pickupDateTime)) return setError('Return date and time must be after pickup.')
 
-    // Rental mode validation
     if (rentalMode === 'WITH_DRIVER') {
-      if (!pickupAddress.trim()) {
-        return setError('Please enter a valid pickup address for With-Driver booking.')
-      }
+      if (!pickupAddress.trim()) return setError('Please enter a valid pickup address for With-Driver booking.')
     } else if (rentalMode === 'SELF_DRIVE') {
-      if (!outletId) {
-        return setError('Please select a branch outlet for Self-Drive booking.')
-      }
+      if (!outletId) return setError('Please select a branch outlet for Self-Drive booking.')
     }
 
     setError('')
@@ -112,16 +108,14 @@ export default function BookVehicle() {
         rentalMode,
         ...(rentalMode === 'WITH_DRIVER' ? {
           pickupAddress: pickupAddress.trim(),
-          pickupLat: pickupLat != null ? Number(pickupLat) : 31.5204, // Default dev coordinates if unverified
+          pickupLat: pickupLat != null ? Number(pickupLat) : 31.5204,
           pickupLng: pickupLng != null ? Number(pickupLng) : 74.3587,
           ...(dropoffAddress ? {
             dropoffAddress: dropoffAddress.trim(),
             dropoffLat: dropoffLat != null ? Number(dropoffLat) : 31.5204,
             dropoffLng: dropoffLng != null ? Number(dropoffLng) : 74.3587,
           } : {}),
-        } : {
-          outletId: Number(outletId),
-        }),
+        } : { outletId: Number(outletId) }),
       }
 
       const created = await apiFetch('/bookings', {
@@ -129,6 +123,7 @@ export default function BookVehicle() {
         body: JSON.stringify(payload),
       })
       setBooking(created)
+      setShowConfirm(false)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -184,7 +179,7 @@ export default function BookVehicle() {
                 <button onClick={() => navigate('/login')} style={buttonStyle}>Sign in to book</button>
               </>
             ) : (
-              <form onSubmit={submitBooking} style={{ display: 'flex', flexDirection: 'column', gap: 15, width: '100%', minWidth: 0 }}>
+              <form onSubmit={(e) => { e.preventDefault(); setShowConfirm(true) }} style={{ display: 'flex', flexDirection: 'column', gap: 15, width: '100%', minWidth: 0 }}>
                 {/* Rental Mode (Fixed from Search Selection) */}
                 <Field label="Rental Mode">
                   <div style={{ marginTop: 4 }}>
@@ -310,6 +305,23 @@ export default function BookVehicle() {
               </form>
             )}
           </section>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Confirmation modal that appears before creating a booking
+function ConfirmModal({ open, onClose, onConfirm, summary, loading }) {
+  if (!open) return null
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', zIndex: 60 }}>
+      <div style={{ width: 'min(720px, 92%)', background: '#fff', borderRadius: 12, padding: 20 }}>
+        <h3 style={{ margin: '0 0 12px' }}>Confirm booking</h3>
+        <p style={{ color: '#475467', marginTop: 0 }}>{summary}</p>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+          <button onClick={onClose} style={{ padding: '10px 14px', borderRadius: 8, background: '#fff', border: '1px solid #e6eef3' }}>Cancel</button>
+          <button onClick={onConfirm} disabled={loading} style={{ padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(90deg,#00c472,#00a85a)', color: '#fff' }}>{loading ? 'Sending…' : 'Confirm booking'}</button>
         </div>
       </div>
     </div>
