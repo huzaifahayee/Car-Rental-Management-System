@@ -3,6 +3,7 @@ import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
+import ThemeEditor from '../components/ThemeEditor'
 
 const STATUS_COLORS = {
   PENDING: ['#fef9c3', '#a16207'],
@@ -146,10 +147,10 @@ export default function AdminPanel() {
   const [selectedFile, setSelectedFile] = useState(null)
 
   // Reusable confirmation and error modal states
-  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', confirmBg: '#00c472' })
+  const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', confirmBg: 'var(--brand)' })
   const [errorModal, setErrorModal] = useState({ show: false, title: 'Error', message: '' })
 
-  const showConfirm = (title, message, onConfirm, confirmText = 'Confirm', confirmBg = '#00c472') => {
+  const showConfirm = (title, message, onConfirm, confirmText = 'Confirm', confirmBg = 'var(--brand)') => {
     setConfirmModal({
       show: true,
       title,
@@ -364,11 +365,21 @@ export default function AdminPanel() {
 
   // ---- Update Booking Status & WhatsApp Confirmation ----
   async function handleUpdateBookingStatus(bookingId, newStatus) {
+    const booking = bookings.find(b => b.id === bookingId)
     try {
       await apiFetch(`/bookings/${bookingId}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status: newStatus }),
       })
+
+      if (booking?.vehiclePackage?.id) {
+        setVehicles(prev => prev.map(vehicle => (
+          vehicle.id === booking.vehiclePackage.id
+            ? { ...vehicle, status: newStatus === 'CONFIRMED' ? 'BOOKED' : 'AVAILABLE' }
+            : vehicle
+        )))
+      }
+
       reloadData()
     } catch (err) {
       alert(`Failed to update booking status: ${err.message}`)
@@ -621,28 +632,28 @@ export default function AdminPanel() {
             <p style={{ color: '#9ca3af', fontSize: 12, margin: '3px 0 0' }}>Live rental operations</p>
           </div>
           <div className="flex items-center gap-3">
-            <span style={{ color: '#00c472', fontSize: 11, fontWeight: 800, background: 'rgba(0,196,114,0.15)', padding: '4px 10px', borderRadius: 20 }}>
+            <span style={{ color: 'var(--brand)', fontSize: 11, fontWeight: 800, background: 'rgba(var(--brand-rgb), 0.15)', padding: '4px 10px', borderRadius: 20 }}>
               {user.role}
             </span>
-            <div style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{user.fullName}</div>
+            <div style={{ color: 'var(--surface)', fontSize: 13, fontWeight: 700 }}>{user.fullName}</div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <nav style={{ display: 'flex', gap: 4, width: 'fit-content', background: '#fff', borderRadius: 12, padding: 5, marginBottom: 26, boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-          {['overview', 'bookings', 'vehicles', 'outlets', 'users'].map(item => (
+          {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
             <button
               key={item}
               onClick={() => setTab(item)}
               style={{
                 border: 0, borderRadius: 8, padding: '8px 20px', cursor: 'pointer',
-                background: tab === item ? '#00c472' : 'transparent',
-                color: tab === item ? '#fff' : '#667085',
+                background: tab === item ? 'var(--brand)' : 'transparent',
+                color: tab === item ? 'var(--surface)' : 'var(--muted)',
                 fontWeight: 800, textTransform: 'capitalize',
               }}
             >
-              {item === 'users' ? 'Users & Staff' : item}
+              {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item}
             </button>
           ))}
         </nav>
@@ -666,6 +677,16 @@ export default function AdminPanel() {
           </>
         )}
 
+        {tab === 'themes' && (
+          <DataCard title="Themes">
+            {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
+              <ThemeEditor />
+            ) : (
+              <p style={{ color: '#64748b', margin: 0 }}>Theme settings are only available for admin roles.</p>
+            )}
+          </DataCard>
+        )}
+
         {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleApproveBooking} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} /></DataCard>}
         {tab === 'vehicles' && (
           <DataCard
@@ -675,7 +696,7 @@ export default function AdminPanel() {
                 <button
                   onClick={openCreateVehicleModal}
                   style={{
-                    background: '#00c472', color: '#fff', border: 'none',
+                    background: 'var(--brand)', color: 'var(--surface)', border: 'none',
                     borderRadius: 8, padding: '8px 16px', fontWeight: 700,
                     fontSize: 13, cursor: 'pointer',
                   }}
@@ -702,7 +723,7 @@ export default function AdminPanel() {
               <button
                 onClick={openCreateOutletModal}
                 style={{
-                  background: '#00c472', color: '#fff', border: 'none',
+                  background: 'var(--brand)', color: 'var(--surface)', border: 'none',
                   borderRadius: 8, padding: '8px 16px', fontWeight: 700,
                   fontSize: 13, cursor: 'pointer',
                 }}
@@ -726,7 +747,7 @@ export default function AdminPanel() {
                 <button
                   onClick={openCreateUserModal}
                   style={{
-                    background: '#00c472', color: '#fff', border: 'none',
+                    background: 'var(--brand)', color: 'var(--surface)', border: 'none',
                     borderRadius: 8, padding: '8px 16px', fontWeight: 700,
                     fontSize: 13, cursor: 'pointer',
                   }}
@@ -816,7 +837,7 @@ export default function AdminPanel() {
 
               {editingOutlet && (
                 <div className="flex items-center gap-2 mt-1">
-                  <input type="checkbox" id="isActive" checked={outletForm.isActive} onChange={e => setOutletForm({ ...outletForm, isActive: e.target.checked })} accentColor="#00c472" />
+                  <input type="checkbox" id="isActive" checked={outletForm.isActive} onChange={e => setOutletForm({ ...outletForm, isActive: e.target.checked })} accentColor="var(--brand)" />
                   <label htmlFor="isActive" style={{ fontSize: 13, color: '#333', fontWeight: 600 }}>Active Status (visible to customers)</label>
                 </div>
               )}
@@ -825,7 +846,7 @@ export default function AdminPanel() {
 
               <div className="flex justify-end gap-3 mt-3">
                 <button type="button" onClick={() => setShowOutletModal(false)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={outletSubmitting} style={{ background: '#00c472', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: outletSubmitting ? 0.7 : 1 }}>
+                <button type="submit" disabled={outletSubmitting} style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: outletSubmitting ? 0.7 : 1 }}>
                   {outletSubmitting ? 'Saving...' : 'Save Outlet'}
                 </button>
               </div>
@@ -883,7 +904,7 @@ export default function AdminPanel() {
 
               <div className="flex justify-end gap-3 mt-3">
                 <button type="button" onClick={() => setShowUserModal(false)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={userSubmitting} style={{ background: '#00c472', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: userSubmitting ? 0.7 : 1 }}>
+                <button type="submit" disabled={userSubmitting} style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: userSubmitting ? 0.7 : 1 }}>
                   {userSubmitting ? 'Creating...' : 'Create Account'}
                 </button>
               </div>
@@ -933,7 +954,7 @@ export default function AdminPanel() {
                 type="button"
                 disabled={roleChanging}
                 onClick={handleConfirmRoleChange} 
-                style={{ background: '#00c472', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: roleChanging ? 0.7 : 1 }}
+                style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: roleChanging ? 0.7 : 1 }}
               >
                 {roleChanging ? 'Updating...' : 'Confirm Change'}
               </button>
@@ -1007,7 +1028,7 @@ export default function AdminPanel() {
               <p style={{ margin: '0 0 14px' }}>Are you sure you want to cancel the following booking?</p>
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
                 <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Booking ID: </span><span style={{ color: '#667085', fontWeight: 600 }}>#{cancelBookingModal.bookingNumId}</span></div>
-                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Reference: </span><span style={{ color: '#00a85a', fontWeight: 700 }}>{cancelBookingModal.bookingRef}</span></div>
+                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Reference: </span><span style={{ color: 'var(--brand-2)', fontWeight: 700 }}>{cancelBookingModal.bookingRef}</span></div>
                 <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Customer: </span>{cancelBookingModal.customerName}</div>
                 <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Vehicle: </span>{cancelBookingModal.vehicleName}</div>
               </div>
@@ -1055,7 +1076,7 @@ export default function AdminPanel() {
             <div style={{ margin: '16px 0', fontSize: 14, lineHeight: 1.6, color: '#475467' }}>
               <p style={{ margin: '0 0 14px' }}>Are you sure you want to permanently remove this cancelled booking from records?</p>
               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
-                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Reference: </span><span style={{ color: '#00a85a', fontWeight: 700 }}>{deleteBookingModal.bookingRef}</span></div>
+                <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Reference: </span><span style={{ color: 'var(--brand-2)', fontWeight: 700 }}>{deleteBookingModal.bookingRef}</span></div>
                 <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Customer: </span>{deleteBookingModal.customerName}</div>
                 <div><span style={{ fontWeight: 700, color: '#1a1a2e' }}>Vehicle: </span>{deleteBookingModal.vehicleName}</div>
               </div>
@@ -1209,8 +1230,8 @@ export default function AdminPanel() {
                 <div 
                   onClick={() => setVehicleForm(prev => ({ ...prev, hasAC: !prev.hasAC }))}
                   style={{
-                    border: `2px solid ${vehicleForm.hasAC ? '#00c472' : '#e2e8f0'}`,
-                    background: vehicleForm.hasAC ? 'rgba(0,196,114,0.04)' : '#fff',
+                    border: `2px solid ${vehicleForm.hasAC ? 'var(--brand)' : '#e2e8f0'}`,
+                    background: vehicleForm.hasAC ? 'rgba(var(--brand-rgb), 0.04)' : '#fff',
                     borderRadius: 12,
                     padding: '12px 16px',
                     cursor: 'pointer',
@@ -1225,8 +1246,8 @@ export default function AdminPanel() {
                     width: 20,
                     height: 20,
                     borderRadius: 6,
-                    border: `2px solid ${vehicleForm.hasAC ? '#00c472' : '#cbd5e1'}`,
-                    background: vehicleForm.hasAC ? '#00c472' : 'transparent',
+                    border: `2px solid ${vehicleForm.hasAC ? 'var(--brand)' : '#cbd5e1'}`,
+                    background: vehicleForm.hasAC ? 'var(--brand)' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1246,8 +1267,8 @@ export default function AdminPanel() {
                 <div 
                   onClick={() => setVehicleForm(prev => ({ ...prev, driverOption: !prev.driverOption }))}
                   style={{
-                    border: `2px solid ${vehicleForm.driverOption ? '#00c472' : '#e2e8f0'}`,
-                    background: vehicleForm.driverOption ? 'rgba(0,196,114,0.04)' : '#fff',
+                    border: `2px solid ${vehicleForm.driverOption ? 'var(--brand)' : '#e2e8f0'}`,
+                    background: vehicleForm.driverOption ? 'rgba(var(--brand-rgb), 0.04)' : '#fff',
                     borderRadius: 12,
                     padding: '12px 16px',
                     cursor: 'pointer',
@@ -1262,8 +1283,8 @@ export default function AdminPanel() {
                     width: 20,
                     height: 20,
                     borderRadius: 6,
-                    border: `2px solid ${vehicleForm.driverOption ? '#00c472' : '#cbd5e1'}`,
-                    background: vehicleForm.driverOption ? '#00c472' : 'transparent',
+                    border: `2px solid ${vehicleForm.driverOption ? 'var(--brand)' : '#cbd5e1'}`,
+                    background: vehicleForm.driverOption ? 'var(--brand)' : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -1297,7 +1318,7 @@ export default function AdminPanel() {
 
               <div className="flex justify-end gap-3 mt-3">
                 <button type="button" onClick={() => setShowVehicleModal(false)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-                <button type="submit" disabled={vehicleSubmitting} style={{ background: '#00c472', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: vehicleSubmitting ? 0.7 : 1 }}>
+                <button type="submit" disabled={vehicleSubmitting} style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: vehicleSubmitting ? 0.7 : 1 }}>
                   {vehicleSubmitting ? 'Saving...' : 'Save Vehicle'}
                 </button>
               </div>
@@ -1377,10 +1398,10 @@ export default function AdminPanel() {
 function Stat({ label: statLabel, value, highlight }) {
   return (
     <div style={{
-      background: highlight ? 'linear-gradient(135deg, #00c472 0%, #00a85a 100%)' : '#fff',
+      background: highlight ? 'linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%)' : '#fff',
       borderRadius: 14,
       padding: '20px 22px',
-      boxShadow: highlight ? '0 4px 16px rgba(0,196,114,.25)' : '0 2px 10px rgba(0,0,0,.05)',
+      boxShadow: highlight ? '0 4px 16px rgba(var(--brand-rgb), .25)' : '0 2px 10px rgba(0,0,0,.05)',
     }}>
       <p style={{ margin: '0 0 8px', color: highlight ? 'rgba(255,255,255,0.8)' : '#8b95a1', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>{statLabel}</p>
       <p style={{ margin: 0, fontSize: 27, color: highlight ? '#fff' : '#1a1a2e', fontWeight: 800 }}>{value}</p>
@@ -1428,11 +1449,11 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
 
             return (
               <tr key={booking.id} style={{ borderTop: '1px solid #f1f3f5' }}>
-                <td style={td}><strong style={{ color: '#00a85a' }}>{booking.bookingReference}</strong></td>
+                <td style={td}><strong style={{ color: 'var(--brand-2)' }}>{booking.bookingReference}</strong></td>
                 <td style={td}>{booking.customer?.fullName || '—'}<small style={small}>{booking.customer?.phone || ''}</small></td>
                 <td style={td}>{booking.vehiclePackage?.make} {booking.vehiclePackage?.model}</td>
                 <td style={td}>
-                  <span style={{ background: '#f0fdf7', color: '#00a85a', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
+                  <span style={{ background: 'rgba(var(--brand-2-rgb), 0.12)', color: 'var(--brand-2)', padding: '3px 8px', borderRadius: 12, fontSize: 11, fontWeight: 700 }}>
                     {booking.rentalMode === 'WITH_DRIVER' ? 'With-Driver' : 'Self-Drive'}
                   </span>
                 </td>
@@ -1450,7 +1471,7 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
                         <button
                           onClick={() => onStatusChange(booking, 'CONFIRMED')}
                           style={{
-                            background: '#00c472',
+                            background: 'var(--brand)',
                             color: '#fff',
                             border: 'none',
                             borderRadius: 6,
@@ -1612,7 +1633,7 @@ function OutletsTable({ outlets, onEdit, onDeactivate }) {
               <td style={td}>{outlet.city}</td>
               <td style={td}>{outlet.addressText}</td>
               <td style={td}>
-                <a href={`https://www.google.com/maps/dir/?api=1&destination=${outlet.latitude},${outlet.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: '#00a85a', textDecoration: 'underline' }}>
+                <a href={`https://www.google.com/maps/dir/?api=1&destination=${outlet.latitude},${outlet.longitude}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand-2)', textDecoration: 'underline' }}>
                   {outlet.latitude.toFixed(4)}, {outlet.longitude.toFixed(4)} ↗
                 </a>
               </td>

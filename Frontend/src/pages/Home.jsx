@@ -13,11 +13,11 @@ const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
 const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, and reliable'
 
-// PLACEHOLDER: dummy stats, replace with real numbers once available
-const STATS = [
-  { value: 500, suffix: '+', label: 'Car Vendors' },
-  { value: 50, suffix: '+', label: 'Cities Covered' },
-  { value: 5, suffix: 'M+', label: 'Happy Travelers' },
+// Real stats fetched from backend
+const DEFAULT_STATS = [
+  { value: 0, suffix: '+', label: 'Car Vendors' },
+  { value: 0, suffix: '+', label: 'Cities Covered' },
+  { value: 0, suffix: '+', label: 'Happy Travelers' },
   { value: '24/7', label: 'Customer Support' },
 ]
 
@@ -84,6 +84,7 @@ export default function Home() {
 
   // Self-drive outlet state
   const [outlets, setOutlets] = useState([])
+  const [stats, setStats] = useState(DEFAULT_STATS)
   const [selectedOutletId, setSelectedOutletId] = useState('')
   const [loadingOutlets, setLoadingOutlets] = useState(false)
   const [outletError, setOutletError] = useState('')
@@ -105,6 +106,20 @@ export default function Home() {
       })
       .catch((err) => setOutletError(err.message))
       .finally(() => setLoadingOutlets(false))
+  }, [])
+
+  // Fetch public stats for homepage
+  useEffect(() => {
+    apiFetch('/public/stats')
+      .then(data => {
+        setStats([
+          { value: data.vehiclesCount || 0, suffix: '+', label: 'Car Vendors' },
+          { value: data.citiesCount || 0, suffix: '+', label: 'Cities Covered' },
+          { value: data.completedBookings || 0, suffix: '+', label: 'Happy Travelers' },
+          { value: '24/7', label: 'Customer Support' },
+        ])
+      })
+      .catch(() => {})
   }, [])
 
   // Also fetch outlets when self-drive selection needs fresh list
@@ -257,7 +272,7 @@ export default function Home() {
         <div className="hero-road-lines" aria-hidden="true" />
 
         <div className="hero-content relative max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
-          <p className="hero-enter hero-enter-1" style={{ color: '#00c472', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+          <p className="hero-enter hero-enter-1" style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
             Car Rental Booking
           </p>
           <h1 className="hero-enter hero-enter-2" style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 44px)', lineHeight: 1.2, marginBottom: 12 }}>
@@ -283,12 +298,12 @@ export default function Home() {
                         onClick={() => setTripType(type)}
                         style={{
                           width: 18, height: 18, borderRadius: '50%',
-                          border: `2px solid ${tripType === type ? '#00c472' : '#ccc'}`,
+                          border: `2px solid ${tripType === type ? 'var(--brand)' : '#ccc'}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: 'pointer', flexShrink: 0,
                         }}
                       >
-                        {tripType === type && <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#00c472' }} />}
+                        {tripType === type && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--brand)' }} />}
                       </div>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
                         {type === 'within' ? 'Within City' : 'Out of City'}
@@ -311,12 +326,12 @@ export default function Home() {
                         onClick={() => setRentalMode(mode)}
                         style={{
                           width: 18, height: 18, borderRadius: '50%',
-                          border: `2px solid ${rentalMode === mode ? '#00c472' : '#ccc'}`,
+                          border: `2px solid ${rentalMode === mode ? 'var(--brand)' : '#ccc'}`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           cursor: 'pointer', flexShrink: 0,
                         }}
                       >
-                        {rentalMode === mode && <div style={{ width: 9, height: 9, borderRadius: '50%', background: '#00c472' }} />}
+                        {rentalMode === mode && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--brand)' }} />}
                       </div>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
                         {label}
@@ -446,12 +461,12 @@ export default function Home() {
 
             <button
               className="search-cta"
-              style={{
-                background: 'linear-gradient(90deg, #00c472, #00a85a)',
-                color: '#fff', border: 'none', borderRadius: 12,
+                style={{
+                background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
+                color: 'var(--surface)', border: 'none', borderRadius: 12,
                 padding: '14px 48px', fontWeight: 800, fontSize: 15,
                 cursor: 'pointer', width: '100%', letterSpacing: 0.5,
-                boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
@@ -468,7 +483,7 @@ export default function Home() {
       {/* Stats bar */}
       <section style={{ background: '#fff', borderBottom: '1px solid #eee' }}>
         <div className="max-w-5xl mx-auto px-6 py-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          {STATS.map((s, index) => <Stat key={s.label} {...s} delay={index * 90} />)}
+          {stats.map((s, index) => <Stat key={s.label} {...s} delay={index * 90} />)}
         </div>
       </section>
 
@@ -497,11 +512,11 @@ export default function Home() {
               style={{
                 padding: '8px 18px', borderRadius: 30,
                 border: '1.5px solid #d8f5ea', background: '#f0fdf7',
-                color: '#00a85a', fontSize: 13, fontWeight: 600,
+                color: 'var(--brand-2)', fontSize: 13, fontWeight: 600,
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#00c472'; e.currentTarget.style.color = '#fff' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf7'; e.currentTarget.style.color = '#00a85a' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--brand)'; e.currentTarget.style.color = 'var(--surface)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf7'; e.currentTarget.style.color = 'var(--brand-2)' }}
             >
               {typeof item === 'string' ? item : item.city}
             </button>
@@ -516,7 +531,7 @@ export default function Home() {
           <p style={{ color: '#777', fontSize: 14, marginBottom: 32 }}>Comprehensive car rental solutions in every major city</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {(cityGroups.length ? cityGroups : CITY_CONTENT).slice(0, 6).map((item, idx) => (
-              <div key={item.city || idx} style={{ borderLeft: '3px solid #00c472', paddingLeft: 20 }}>
+              <div key={item.city || idx} style={{ borderLeft: '3px solid var(--brand)', paddingLeft: 20 }}>
                 <h3 style={{ fontWeight: 700, fontSize: 16, color: '#1a1a2e', marginBottom: 8 }}>{item.city || item.name || item}</h3>
                 <p style={{ fontSize: 14, color: '#555', lineHeight: 1.75 }}>{
                   item.outlets ? (
@@ -546,12 +561,12 @@ export default function Home() {
                   boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #e8faf2',
                   transition: 'transform 0.15s, box-shadow 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,196,114,0.15)' }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(var(--brand-rgb),0.15)' }}
                 onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(0,0,0,0.06)' }}
               >
                 <div style={{
                   minWidth: 40, height: 40, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #00c472, #00a85a)',
+                  background: 'linear-gradient(135deg, var(--brand), var(--brand-2))',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#fff', fontWeight: 800, fontSize: 16,
                 }}>
@@ -610,7 +625,7 @@ function StaffHomeLanding({ user }) {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(15,32,39,0.6) 0%, rgba(15,32,39,0.85) 100%)' }} />
 
         <div className="max-w-4xl mx-auto px-6 py-20 text-center relative">
-          <p style={{ color: '#00c472', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
+          <p style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
             Staff Dashboard
           </p>
           <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 40px)', lineHeight: 1.2, marginBottom: 12 }}>
@@ -624,7 +639,7 @@ function StaffHomeLanding({ user }) {
             type="button"
             onClick={handleViewAllCars}
             style={{
-              background: 'linear-gradient(90deg, #00c472, #00a85a)',
+              background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
               color: '#fff',
               border: 'none',
               borderRadius: 12,
@@ -633,7 +648,7 @@ function StaffHomeLanding({ user }) {
               fontSize: 15,
               cursor: 'pointer',
               letterSpacing: 0.5,
-              boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+              boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
             }}
           >
             View All Cars
@@ -701,7 +716,7 @@ function Stat({ value, suffix = '', label, delay }) {
 
   return (
     <div ref={ref} className={visible ? 'stat-visible' : 'stat-hidden'} style={{ transitionDelay: `${delay}ms` }}>
-      <div style={{ fontSize: 26, fontWeight: 800, color: '#00c472' }}>
+      <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--brand)' }}>
         {typeof value === 'number' ? <CountUp target={value} active={visible} /> : value}{suffix}
       </div>
       <div style={{ fontSize: 13, color: '#777', fontWeight: 500 }}>{label}</div>

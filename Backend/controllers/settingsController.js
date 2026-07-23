@@ -26,3 +26,30 @@ async function updateSettings(req, res) {
 }
 
 module.exports = { getSettings, updateSettings }
+
+async function getTheme(req, res) {
+  try {
+    const settings = await req.prisma.settings.findFirst()
+    res.json({ themePalette: settings?.themePalette || 'default' })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch theme', details: err.message })
+  }
+}
+
+async function updateTheme(req, res) {
+  try {
+    const { themePalette } = req.body
+    const existing = await req.prisma.settings.findFirst()
+    if (!existing) {
+      const created = await req.prisma.settings.create({ data: { agencyName: 'Unnamed Agency', contactEmail: 'admin@example.com', themePalette } })
+      return res.json(created)
+    }
+    const updated = await req.prisma.settings.update({ where: { id: existing.id }, data: { themePalette } })
+    res.json(updated)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update theme', details: err.message })
+  }
+}
+
+module.exports.getTheme = getTheme
+module.exports.updateTheme = updateTheme

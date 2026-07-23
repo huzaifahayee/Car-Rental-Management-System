@@ -157,16 +157,27 @@ async function updateBookingStatus(req, res) {
   }
 
   try {
-    const booking = await req.prisma.booking.update({
-      where: { id: Number(req.params.id) },
-      data: { status },
-      include: {
-        customer: { select: { id: true, fullName: true, email: true, phone: true } },
-        vehiclePackage: true,
-        outlet: true,
-      },
-    })
-    res.json(booking)
+    const booking = await req.prisma.booking.findUnique({ where: { id: Number(req.params.id) } })
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' })
+
+    const vehicleStatus = status === 'CONFIRMED' ? 'BOOKED' : 'AVAILABLE'
+    const [updatedBooking] = await req.prisma.$transaction([
+      req.prisma.booking.update({
+        where: { id: Number(req.params.id) },
+        data: { status },
+        include: {
+          customer: { select: { id: true, fullName: true, email: true, phone: true } },
+          vehiclePackage: true,
+          outlet: true,
+        },
+      }),
+      req.prisma.vehiclePackage.update({
+        where: { id: booking.vehiclePackageId },
+        data: { status: vehicleStatus },
+      }),
+    ])
+
+    res.json(updatedBooking)
   } catch (err) {
     res.status(500).json({ error: 'Failed to update booking status', details: err.message })
   }
@@ -187,15 +198,21 @@ async function cancelBooking(req, res) {
       return res.status(400).json({ error: `Cannot cancel a booking with status ${booking.status}.` })
     }
 
-    const updated = await req.prisma.booking.update({
-      where: { id },
-      data: { status: 'CANCELLED' },
-      include: {
-        customer: { select: { id: true, fullName: true, email: true, phone: true } },
-        vehiclePackage: true,
-        outlet: true,
-      },
-    })
+    const [updated] = await req.prisma.$transaction([
+      req.prisma.booking.update({
+        where: { id },
+        data: { status: 'CANCELLED' },
+        include: {
+          customer: { select: { id: true, fullName: true, email: true, phone: true } },
+          vehiclePackage: true,
+          outlet: true,
+        },
+      }),
+      req.prisma.vehiclePackage.update({
+        where: { id: booking.vehiclePackageId },
+        data: { status: 'AVAILABLE' },
+      }),
+    ])
 
     res.json(updated)
   } catch (err) {

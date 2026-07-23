@@ -70,7 +70,7 @@ export default function Register() {
   }
 
   function focusHandler(e) {
-    e.currentTarget.style.borderColor = '#00c472'
+    e.currentTarget.style.borderColor = 'var(--brand)'
   }
   function blurHandler(e) {
     e.currentTarget.style.borderColor = '#e0e0e0'
@@ -84,7 +84,7 @@ export default function Register() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div style={{ background: '#00c472', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <div style={{ background: 'var(--brand)', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>G</span>
             </div>
             <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Create an account</h1>
@@ -201,12 +201,12 @@ export default function Register() {
 
             {/* Terms */}
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required style={{ accentColor: '#00c472', width: 18, height: 18, marginTop: 1 }} />
+              <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} required style={{ accentColor: 'var(--brand)', width: 18, height: 18, marginTop: 1 }} />
               <span style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
                 I agree to the{' '}
-                <a href="#" style={{ color: '#00c472', textDecoration: 'none', fontWeight: 600 }}>Terms and Conditions</a>
+                <a href="#" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Terms and Conditions</a>
                 {' '}and{' '}
-                <a href="#" style={{ color: '#00c472', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
+                <a href="#" style={{ color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Privacy Policy</a>
               </span>
             </label>
             {fieldErrors.agreed && <p className="field-error" style={{ marginTop: -10 }}>{fieldErrors.agreed}</p>}
@@ -214,11 +214,11 @@ export default function Register() {
             <button
               type="submit"
               style={{
-                background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
                 color: '#fff', border: 'none', borderRadius: 12,
                 padding: '13px', fontWeight: 800, fontSize: 15,
                 cursor: 'pointer', marginTop: 4,
-                boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
@@ -236,7 +236,7 @@ export default function Register() {
 
           <p style={{ textAlign: 'center', fontSize: 14, color: '#666' }}>
             Already have an account?{' '}
-            <Link to="/login" style={{ color: '#00c472', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to="/login" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
               Sign in
             </Link>
           </p>

@@ -50,7 +50,7 @@ export default function Login() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div style={{ background: '#00c472', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+            <div style={{ background: 'var(--brand)', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>G</span>
             </div>
             <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Welcome back</h1>
@@ -83,7 +83,7 @@ export default function Login() {
                   borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
                   boxSizing: 'border-box', transition: 'border-color 0.15s',
                 }}
-                onFocus={e => { e.currentTarget.style.borderColor = '#00c472' }}
+                onFocus={e => { e.currentTarget.style.borderColor = 'var(--brand)' }}
                 onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0' }}
               />
               {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
@@ -94,7 +94,7 @@ export default function Login() {
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 1 }}>
                   Password
                 </label>
-                <a href="#" style={{ fontSize: 13, color: '#00c472', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
+                <a href="#" style={{ fontSize: 13, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
               </div>
               <div style={{ position: 'relative' }}>
                 <input
@@ -111,7 +111,7 @@ export default function Login() {
                     borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
                     boxSizing: 'border-box', transition: 'border-color 0.15s',
                   }}
-                  onFocus={e => { e.currentTarget.style.borderColor = '#00c472' }}
+                  onFocus={e => { e.currentTarget.style.borderColor = 'var(--brand)' }}
                   onBlur={e => { e.currentTarget.style.borderColor = '#e0e0e0' }}
                 />
                 <button
@@ -128,11 +128,11 @@ export default function Login() {
             <button
               type="submit"
               style={{
-                background: 'linear-gradient(90deg, #00c472, #00a85a)',
+                background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
                 color: '#fff', border: 'none', borderRadius: 12,
                 padding: '13px', fontWeight: 800, fontSize: 15,
                 cursor: 'pointer', marginTop: 4,
-                boxShadow: '0 4px 20px rgba(0,196,114,0.35)',
+                boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)' }}
@@ -151,7 +151,7 @@ export default function Login() {
 
           <p style={{ textAlign: 'center', fontSize: 14, color: '#666' }}>
             Don't have an account?{' '}
-            <Link to="/register" style={{ color: '#00c472', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to="/register" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
               Create one
             </Link>
           </p>

@@ -10,7 +10,7 @@ export default function VehicleCard({ vehicle, onBook, currentUser }) {
   const isStaff = currentUser && STAFF_ROLES.includes(currentUser.role)
 
   const statusConfig = {
-    AVAILABLE: { bg: '#e8faf2', color: '#00a85a', text: 'Available' },
+    AVAILABLE: { bg: 'rgba(var(--brand-2-rgb), 0.12)', color: 'var(--brand-2)', text: 'Available' },
     BOOKED: { bg: '#e0f2fe', color: '#0369a1', text: 'Booked' },
     MAINTENANCE: { bg: '#fef3c7', color: '#d97706', text: 'Maintenance' },
     INACTIVE: { bg: '#f3f4f6', color: '#6b7280', text: 'Inactive' },
@@ -53,7 +53,7 @@ export default function VehicleCard({ vehicle, onBook, currentUser }) {
       <div style={{ padding: '16px 18px' }}>
         <div className="flex justify-between gap-3">
           <h2 style={{ margin: 0, fontSize: 16, color: '#1a1a2e' }}>{vehicle.make} {vehicle.model}</h2>
-          <strong style={{ color: '#00a85a', whiteSpace: 'nowrap' }}>Rs {vehicle.pricePerDay.toLocaleString()}/day</strong>
+          <strong style={{ color: 'var(--brand-2)', whiteSpace: 'nowrap' }}>Rs {vehicle.pricePerDay.toLocaleString()}/day</strong>
         </div>
         <p style={{ color: '#888', fontSize: 13 }}>{vehicle.pickupCity} · {vehicle.seatingCapacity} seats · {vehicle.transmission.toLowerCase()}</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: isStaff ? 0 : 14 }}>
@@ -70,7 +70,7 @@ export default function VehicleCard({ vehicle, onBook, currentUser }) {
               border: 'none',
               borderRadius: 10,
               padding: 10,
-              background: available ? 'linear-gradient(90deg,#00c472,#00a85a)' : '#e5e7eb',
+              background: available ? 'linear-gradient(90deg,var(--brand),var(--brand-2))' : '#e5e7eb',
               color: available ? '#fff' : '#9ca3af',
               fontWeight: 800,
               cursor: available ? 'pointer' : 'not-allowed',

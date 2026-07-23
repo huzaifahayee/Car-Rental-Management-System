@@ -2,13 +2,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import apiFetch from '../lib/apiClient'
+import { applyThemeFromName } from '../lib/theme'
 
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
 const adminPanelLinkStyle = (active) => ({
-  background: active ? '#00a85a' : '#00c472',
-  color: '#fff',
+  background: active ? 'var(--brand-2)' : 'var(--brand)',
+  color: 'var(--surface)',
   borderRadius: 8,
   padding: '8px 16px',
   fontSize: 14,
@@ -54,6 +56,18 @@ export default function Layout() {
     closeMobileMenu()
   }, [location.pathname])
 
+  // Fetch tenant settings (theme) once and apply
+  useEffect(() => {
+    let mounted = true
+    apiFetch('/settings/theme')
+      .then(data => {
+        if (!mounted) return
+        if (data && data.themePalette) applyThemeFromName(data.themePalette)
+      })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
   // Smooth-scroll to hash targets (e.g. /#destinations) after navigation
   useEffect(() => {
     const hash = location.hash
@@ -98,13 +112,13 @@ export default function Layout() {
   }, [])
 
   return (
-    <div style={{ fontFamily: "'Inter', 'Nunito', sans-serif", background: '#f5f7fa', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter', 'Nunito', sans-serif", background: 'var(--page-bg)', minHeight: '100vh' }}>
 
       <header style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="w-full px-6 md:px-10 flex items-center justify-between py-4">
           <Link to="/" onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ background: '#00c472', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 18 }}>G</span>
+            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 18 }}>G</span>
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e', lineHeight: 1.1 }}>{PLACEHOLDER_AGENCY_NAME}</div>
@@ -172,7 +186,7 @@ export default function Layout() {
             ) : (
               <>
                 <Link to="/login" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Login</Link>
-                <Link to="/register" style={{ background: '#00c472', color: '#fff', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Register</Link>
+                <Link to="/register" style={{ background: 'var(--brand)', color: 'var(--surface)', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>Register</Link>
               </>
             )}
           </nav>
@@ -215,9 +229,9 @@ function Footer() {
     <footer id="contact" style={{ background: '#111827', color: '#9ca3af' }}>
       <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 gap-10">
         <div>
-          <div className="flex items-center gap-2 mb-4">
-            <div style={{ background: '#00c472', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 15 }}>G</span>
+            <div className="flex items-center gap-2 mb-4">
+            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 15 }}>G</span>
             </div>
             <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{PLACEHOLDER_AGENCY_NAME}</span>
           </div>
@@ -232,7 +246,7 @@ function Footer() {
                   <a
                     href="#"
                     style={{ color: '#9ca3af', fontSize: 14, textDecoration: 'none', transition: 'color 0.15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.color = '#00c472' }}
+                    onMouseEnter={e => { e.currentTarget.style.color = 'var(--brand)' }}
                     onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af' }}
                   >
                     {l}

@@ -79,12 +79,12 @@ export default function SearchResults() {
         <div className="max-w-7xl mx-auto px-6 flex flex-wrap justify-between items-center gap-4">
           <div>
             <strong style={{ color: '#fff', fontSize: 15 }}>Find your perfect rental</strong>
-            <span style={{ marginLeft: 10, color: '#00c472' }}>Live availability</span>
+            <span style={{ marginLeft: 10, color: 'var(--brand)' }}>Live availability</span>
           </div>
           
           {rentalMode && (
             <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-xl">
-              <span style={{ background: '#00c472', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 20 }}>
+<span style={{ background: 'var(--brand)', color: 'var(--surface)', fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 20 }}>
                 {rentalMode === 'WITH_DRIVER' ? 'WITH DRIVER' : 'SELF DRIVE'}
               </span>
               
@@ -104,7 +104,7 @@ export default function SearchResults() {
                       href={`https://www.google.com/maps/dir/?api=1&destination=${selectedOutlet.latitude},${selectedOutlet.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: '#00c472', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}
+                      style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}
                     >
                       Get Directions ↗
                     </a>
@@ -134,8 +134,8 @@ export default function SearchResults() {
                   padding: '9px 12px', borderRadius: 8, marginBottom: 4,
                   border: 'none', cursor: 'pointer', fontSize: 14,
                   fontWeight: activeCategory === category ? 700 : 500,
-                  background: activeCategory === category ? '#e8faf2' : 'transparent',
-                  color: activeCategory === category ? '#00a85a' : '#555',
+                  background: activeCategory === category ? 'rgba(var(--brand-2-rgb), 0.12)' : 'transparent',
+                  color: activeCategory === category ? 'var(--brand-2)' : '#555',
                 }}
               >
                 {category === 'all' ? 'All Vehicles' : formatCategory(category)}
@@ -183,7 +183,7 @@ const filterLabel = { fontSize: 12, fontWeight: 700, color: '#888', textTransfor
 function FilterToggle({ label, value, onChange }) {
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12, cursor: 'pointer', fontSize: 14, color: '#444' }}>
-      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} accentColor="#00c472" />
+      <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} accentColor="var(--brand)" />
       {label}
     </label>
   )

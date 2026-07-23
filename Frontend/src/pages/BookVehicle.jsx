@@ -58,6 +58,10 @@ export default function BookVehicle() {
   const [booking, setBooking] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
 
+  const confirmSummary = pickupDateTime && returnDateTime
+    ? `Confirm booking for ${vehicle?.make} ${vehicle?.model} from ${new Date(pickupDateTime).toLocaleString()} to ${new Date(returnDateTime).toLocaleString()}.`
+    : 'Please review your trip details before confirming.'
+
   useEffect(() => {
     apiFetch(`/vehicles/${id}`)
       .then(setVehicle)
@@ -136,11 +140,11 @@ export default function BookVehicle() {
   if (booking) return <Confirmation booking={booking} vehicle={vehicle} />
 
   return (
-    <div style={{ background: '#f5f7fa', minHeight: '100vh', padding: '48px 16px' }}>
+    <div style={{ background: 'var(--page-bg)', minHeight: '100vh', padding: '48px 16px' }}>
       <div className="max-w-4xl mx-auto">
         <button
           onClick={() => navigate(-1)}
-          style={{ background: 'none', border: 'none', color: '#00a85a', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: 0 }}
+          style={{ background: 'none', border: 'none', color: 'var(--brand-2)', fontWeight: 700, fontSize: 14, cursor: 'pointer', padding: 0 }}
         >
           ← Back to vehicles
         </button>
@@ -160,7 +164,7 @@ export default function BookVehicle() {
             
             <div style={{ borderTop: '1px solid #e8edf0', paddingTop: 18, marginTop: 22 }}>
               <span style={{ color: '#667085', fontSize: 13 }}>From</span>
-              <div style={{ color: '#00a85a', fontWeight: 800, fontSize: 28 }}>
+              <div style={{ color: 'var(--brand-2)', fontWeight: 800, fontSize: 28 }}>
                 Rs {vehicle.pricePerDay.toLocaleString()}<span style={{ color: '#667085', fontSize: 14 }}>/day</span>
               </div>
             </div>
@@ -184,20 +188,20 @@ export default function BookVehicle() {
                 <Field label="Rental Mode">
                   <div style={{ marginTop: 4 }}>
                     <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        background: '#e8faf2',
-                        color: '#00a85a',
-                        border: '1.5px solid #00c472',
-                        borderRadius: 8,
-                        padding: '6px 14px',
-                        fontSize: 13,
-                        fontWeight: 700,
-                        letterSpacing: 0.5,
-                      }}
-                    >
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            background: 'rgba(232, 250, 242, 0.9)',
+                            color: 'var(--brand-2)',
+                            border: '1.5px solid var(--brand)',
+                            borderRadius: 8,
+                            padding: '6px 14px',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            letterSpacing: 0.5,
+                          }}
+                        >
                       ✓ {rentalMode === 'WITH_DRIVER' ? 'With-Driver Rental' : 'Self-Drive (Without Driver)'}
                     </span>
                   </div>
@@ -307,6 +311,13 @@ export default function BookVehicle() {
           </section>
         </div>
       </div>
+      <ConfirmModal
+        open={showConfirm}
+        summary={confirmSummary}
+        loading={submitting}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={doCreateBooking}
+      />
     </div>
   )
 }
@@ -321,7 +332,7 @@ function ConfirmModal({ open, onClose, onConfirm, summary, loading }) {
         <p style={{ color: '#475467', marginTop: 0 }}>{summary}</p>
         <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
           <button onClick={onClose} style={{ padding: '10px 14px', borderRadius: 8, background: '#fff', border: '1px solid #e6eef3' }}>Cancel</button>
-          <button onClick={onConfirm} disabled={loading} style={{ padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(90deg,#00c472,#00a85a)', color: '#fff' }}>{loading ? 'Sending…' : 'Confirm booking'}</button>
+          <button onClick={onConfirm} disabled={loading} style={{ padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(90deg, var(--brand), var(--brand-2))', color: 'var(--surface)' }}>{loading ? 'Sending…' : 'Confirm booking'}</button>
         </div>
       </div>
     </div>
@@ -332,7 +343,7 @@ function Confirmation({ booking, vehicle }) {
   return (
     <div style={{ background: '#f0fdf7', minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 16 }}>
       <section style={{ ...cardStyle, maxWidth: 520, textAlign: 'center' }}>
-        <div style={{ width: 56, height: 56, margin: '0 auto 16px', display: 'grid', placeItems: 'center', borderRadius: '50%', background: '#d8f8e8', color: '#009e5a', fontSize: 28 }}>
+        <div style={{ width: 56, height: 56, margin: '0 auto 16px', display: 'grid', placeItems: 'center', borderRadius: '50%', background: 'rgba(var(--brand-rgb),0.12)', color: 'var(--brand-2)', fontSize: 28 }}>
           ✓
         </div>
         <p style={eyebrow}>Booking received</p>
@@ -340,7 +351,7 @@ function Confirmation({ booking, vehicle }) {
         
         <p style={{ color: '#667085', lineHeight: 1.6, marginBottom: 18 }}>
           Your {vehicle.make} {vehicle.model} booking reference is{' '}
-          <strong style={{ color: '#00a85a' }}>{booking.bookingReference}</strong>.
+          <strong style={{ color: 'var(--brand-2)' }}>{booking.bookingReference}</strong>.
         </p>
 
         <div style={{ background: '#fff', border: '1px solid #d8f8e8', borderRadius: 12, padding: 16, textAlign: 'left', fontSize: 13, color: '#444', marginBottom: 20 }}>
@@ -376,14 +387,14 @@ function PageState({ title, text }) {
       <div>
         <h1 style={{ color: '#1a1a2e' }}>{title}</h1>
         {text && <p style={{ color: '#667085' }}>{text}</p>}
-        <Link to="/search" style={{ color: '#00a85a' }}>Back to search</Link>
+        <Link to="/search" style={{ color: 'var(--brand-2)' }}>Back to search</Link>
       </div>
     </div>
   )
 }
 
-const cardStyle = { background: '#fff', borderRadius: 18, padding: 28, boxShadow: '0 8px 28px rgba(16,24,40,.08)', width: '100%', minWidth: 0, boxSizing: 'border-box' }
-const eyebrow = { margin: '0 0 8px', color: '#00a85a', fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }
-const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 16px', border: '1.5px solid #d0d5dd', borderRadius: 10, color: '#1a1a2e', background: '#fff', fontSize: 14 }
-const inputContainerStyle = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #d0d5dd', borderRadius: 10, padding: '11px 16px', background: '#fff' }
-const buttonStyle = { width: '100%', border: 'none', borderRadius: 10, padding: '12px 16px', background: 'linear-gradient(90deg,#00c472,#00a85a)', color: '#fff', fontWeight: 800, cursor: 'pointer' }
+const cardStyle = { background: 'var(--surface)', borderRadius: 18, padding: 28, boxShadow: '0 8px 28px rgba(16,24,40,.08)', width: '100%', minWidth: 0, boxSizing: 'border-box' }
+const eyebrow = { margin: '0 0 8px', color: 'var(--brand-2)', fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: 'uppercase' }
+const inputStyle = { width: '100%', boxSizing: 'border-box', padding: '11px 16px', border: '1.5px solid #d0d5dd', borderRadius: 10, color: 'var(--text)', background: 'var(--surface)', fontSize: 14 }
+const inputContainerStyle = { width: '100%', boxSizing: 'border-box', border: '1.5px solid #d0d5dd', borderRadius: 10, padding: '11px 16px', background: 'var(--surface)' }
+const buttonStyle = { width: '100%', border: 'none', borderRadius: 10, padding: '12px 16px', background: 'linear-gradient(90deg,var(--brand),var(--brand-2))', color: 'var(--surface)', fontWeight: 800, cursor: 'pointer' }

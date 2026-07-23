@@ -42,8 +42,8 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
           width: '100%',
           boxSizing: 'border-box',
           minWidth: 0,
-          background: '#fff',
-          color: '#1a1a2e',
+          background: 'var(--surface)',
+          color: 'var(--text)',
           border: '1.5px solid #d0d5dd',
           borderRadius: '10px',
           padding: '11px 16px',
@@ -57,8 +57,8 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
           outline: 'none',
           gap: 8,
           transition: 'all 0.2s ease',
-          boxShadow: isOpen ? '0 0 0 3px rgba(0,196,114,0.15)' : 'none',
-          borderColor: isOpen ? '#00c472' : '#d0d5dd',
+          boxShadow: isOpen ? '0 0 0 3px rgba(var(--brand-rgb),0.15)' : 'none',
+          borderColor: isOpen ? 'var(--brand)' : '#d0d5dd',
         }}
       >
         <span style={{ flexGrow: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
@@ -131,8 +131,8 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
                   setIsOpen(false)
                 }}
                 style={{
-                  background: isSelected ? 'rgba(0,196,114,0.08)' : 'transparent',
-                  color: isSelected ? '#00a85e' : '#1a1a2e',
+                  background: isSelected ? 'rgba(var(--brand-rgb),0.08)' : 'transparent',
+                  color: isSelected ? 'var(--brand-2)' : '#1a1a2e',
                   border: 'none',
                   borderRadius: '14px',
                   padding: '10px 16px',
@@ -158,7 +158,7 @@ export default function IOSDropdown({ value, onChange, options, label, style = {
                   {opt.label}
                 </span>
                 {isSelected && (
-                  <span style={{ color: '#00c472', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>✓</span>
+                  <span style={{ color: 'var(--brand)', fontSize: '14px', fontWeight: 'bold', flexShrink: 0 }}>✓</span>
                 )}
               </button>
             )

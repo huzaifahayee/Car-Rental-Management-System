@@ -135,23 +135,23 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
         style={{
           width: '100%',
           textAlign: 'left',
-          background: '#fff',
-          border: isOpen ? '2px solid #00c472' : '1.5px solid #d0d5dd',
+          background: 'var(--surface)',
+          border: isOpen ? '2px solid var(--brand)' : '1.5px solid #d0d5dd',
           borderRadius: 10,
           padding: '11px 16px',
           fontSize: 14,
-          color: value ? '#1a1a2e' : '#667085',
+          color: value ? 'var(--text)' : '#667085',
           fontWeight: 500,
           cursor: 'pointer',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          boxShadow: isOpen ? '0 0 0 4px rgba(0, 196, 114, 0.15)' : 'none',
+          boxShadow: isOpen ? '0 0 0 4px rgba(var(--brand-rgb), 0.15)' : 'none',
           transition: 'all 0.2s ease',
         }}
       >
         <span>{getDisplayText()}</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00c472" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
           <line x1="16" y1="2" x2="16" y2="6"></line>
           <line x1="8" y1="2" x2="8" y2="6"></line>
@@ -253,7 +253,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
                     height: 32,
                     fontSize: 13,
                     fontWeight: isSelected ? 700 : 500,
-                    background: isSelected ? '#00c472' : 'transparent',
+                    background: isSelected ? 'var(--brand)' : 'transparent',
                     color: isPast ? '#d0d5dd' : (isSelected ? '#fff' : '#1d2939'),
                     cursor: isPast ? 'not-allowed' : 'pointer',
                     opacity: isPast ? 0.4 : 1,
@@ -323,7 +323,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
               type="button"
               onClick={handleSave}
               style={{
-                background: '#00c472',
+                background: 'var(--brand)',
                 color: '#ffffff',
                 border: 'none',
                 borderRadius: 8,
@@ -331,7 +331,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
                 fontSize: 13,
                 fontWeight: 700,
                 cursor: 'pointer',
-                boxShadow: '0 2px 4px rgba(0, 196, 114, 0.2)',
+                boxShadow: '0 2px 4px rgba(var(--brand-rgb), 0.2)',
               }}
             >
               Save

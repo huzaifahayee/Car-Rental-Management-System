@@ -8,6 +8,7 @@ const bookingRoutes = require("./routes/bookings")
 const dashboardRoutes = require("./routes/dashboard.js")
 const outletRoutes = require("./routes/outlets")
 const userRoutes = require("./routes/users")
+const publicRoutes = require('./routes/public')
 const cors = require("cors")
 
 const app = express()
@@ -22,6 +23,7 @@ app.use("/bookings", bookingRoutes)
 app.use("/dashboard", dashboardRoutes)
 app.use("/outlets", outletRoutes)
 app.use("/users", userRoutes)
+app.use('/public', publicRoutes)
 // destinations feature removed; cities are derived from outlets
 
 async function startServer() {
