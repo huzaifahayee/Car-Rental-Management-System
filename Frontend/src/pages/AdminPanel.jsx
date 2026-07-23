@@ -394,6 +394,28 @@ export default function AdminPanel() {
     handleUpdateBookingStatus(booking.id, 'CONFIRMED')
   }
 
+  async function handleBookingStatusChange(booking, newStatus) {
+    if (booking.status === 'PENDING' && newStatus === 'CONFIRMED') {
+      handleApproveBooking(booking)
+      return
+    }
+
+    if (newStatus === 'COMPLETED') {
+      showConfirm(
+        'Complete Booking',
+        `Are you sure you want to mark booking ${booking.bookingReference} as completed? This will free the vehicle back to available status.`,
+        async () => {
+          await handleUpdateBookingStatus(booking.id, 'COMPLETED')
+        },
+        'Complete',
+        '#10b981'
+      )
+      return
+    }
+
+    await handleUpdateBookingStatus(booking.id, newStatus)
+  }
+
   // ---- Cancel Booking (with confirmation modal) ----
   const [cancelBookingModal, setCancelBookingModal] = useState({ show: false, bookingId: null, bookingNumId: null, bookingRef: '', customerName: '', customerPhone: '', vehicleName: '' })
   const [cancellingBooking, setCancellingBooking] = useState(false)
@@ -671,7 +693,7 @@ export default function AdminPanel() {
               <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
               <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
             </div>
-            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleApproveBooking} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} compact /></DataCard>
+            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} compact /></DataCard>
             <div style={{ height: 24 }} />
             <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
           </>
@@ -687,7 +709,7 @@ export default function AdminPanel() {
           </DataCard>
         )}
 
-        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleApproveBooking} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} /></DataCard>}
+        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} /></DataCard>}
         {tab === 'vehicles' && (
           <DataCard
             title={`All vehicles (${vehicles.length})`}
@@ -1485,25 +1507,42 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
                         </button>
                       )}
                       {booking.status === 'CONFIRMED' && (
-                        <a
-                          href={waUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            background: '#25D366',
-                            color: '#fff',
-                            borderRadius: 6,
-                            padding: '4px 10px',
-                            fontSize: 12,
-                            fontWeight: 700,
-                            textDecoration: 'none',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          WhatsApp
-                        </a>
+                        <>
+                          <button
+                            onClick={() => onStatusChange(booking, 'COMPLETED')}
+                            style={{
+                              background: '#10b981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Complete
+                          </button>
+                          <a
+                            href={waUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              background: '#25D366',
+                              color: '#fff',
+                              borderRadius: 6,
+                              padding: '4px 10px',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textDecoration: 'none',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            WhatsApp
+                          </a>
+                        </>
                       )}
                       {booking.status !== 'CANCELLED' && booking.status !== 'COMPLETED' && (
                         <button
