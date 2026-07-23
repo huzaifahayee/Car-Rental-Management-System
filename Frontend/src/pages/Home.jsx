@@ -1,5 +1,5 @@
 // Frontend/src/pages/Home.jsx
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import apiFetch from '../lib/apiClient'
@@ -21,20 +21,7 @@ const STATS = [
   { value: '24/7', label: 'Customer Support' },
 ]
 
-const POPULAR_CITIES = [
-  'Rent a Car in Karachi',
-  'Rent a Car in Lahore',
-  'Rent a Car in Islamabad',
-  'Rent a Car in Rawalpindi',
-  'Rent a Car in Peshawar',
-  'Rent a Car in Quetta',
-  'Luxury Car Rental in Lahore',
-  'Coaster for Rent in Lahore',
-  'Rent a Car in Multan',
-  'Rent a Car in Faisalabad',
-  'Rent a Car in Sialkot',
-  'Rent a Car in Gujranwala',
-]
+const POPULAR_CITIES = []
 
 const CITY_CONTENT = [
   {
@@ -107,22 +94,43 @@ export default function Home() {
 
   const [validationError, setValidationError] = useState('')
 
-  // Fetch active outlets when Self-Drive is chosen
+  // Fetch active outlets (used across the Home page for city listing)
+  useEffect(() => {
+    setLoadingOutlets(true)
+    setOutletError('')
+    apiFetch('/outlets')
+      .then((data) => {
+        setOutlets(data)
+        if (!selectedOutletId && data.length > 0) setSelectedOutletId(String(data[0].id))
+      })
+      .catch((err) => setOutletError(err.message))
+      .finally(() => setLoadingOutlets(false))
+  }, [])
+
+  // Also fetch outlets when self-drive selection needs fresh list
   useEffect(() => {
     if (rentalMode === 'SELF_DRIVE' && outlets.length === 0) {
       setLoadingOutlets(true)
-      setOutletError('')
       apiFetch('/outlets')
         .then((data) => {
           setOutlets(data)
-          if (data.length > 0) {
-            setSelectedOutletId(String(data[0].id))
-          }
+          if (!selectedOutletId && data.length > 0) setSelectedOutletId(String(data[0].id))
         })
         .catch((err) => setOutletError(err.message))
         .finally(() => setLoadingOutlets(false))
     }
-  }, [rentalMode, outlets.length])
+  }, [rentalMode, outlets.length, selectedOutletId])
+
+  // Group outlets by city to show unique city list with outlet mentions
+  const cityGroups = useMemo(() => {
+    const map = new Map()
+    for (const o of outlets || []) {
+      const city = (o.city || 'Unknown').trim()
+      if (!map.has(city)) map.set(city, { city, outlets: [] })
+      map.get(city).outlets.push({ id: o.id, name: o.name, address: o.addressText })
+    }
+    return Array.from(map.values())
+  }, [outlets])
 
   function handleHeroMove(event) {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !heroRef.current) return
@@ -483,9 +491,9 @@ export default function Home() {
         <h2 style={{ fontWeight: 800, fontSize: 22, color: '#1a1a2e', marginBottom: 6 }}>Popular Car Rental Destinations</h2>
         <p style={{ color: '#777', fontSize: 14, marginBottom: 20 }}>Explore car rental options across major cities in Pakistan</p>
         <div className="flex flex-wrap gap-3">
-          {POPULAR_CITIES.map(c => (
+          {(cityGroups.length ? cityGroups : POPULAR_CITIES).map(item => (
             <button
-              key={c}
+              key={item.city}
               style={{
                 padding: '8px 18px', borderRadius: 30,
                 border: '1.5px solid #d8f5ea', background: '#f0fdf7',
@@ -495,22 +503,26 @@ export default function Home() {
               onMouseEnter={e => { e.currentTarget.style.background = '#00c472'; e.currentTarget.style.color = '#fff' }}
               onMouseLeave={e => { e.currentTarget.style.background = '#f0fdf7'; e.currentTarget.style.color = '#00a85a' }}
             >
-              {c}
+              {typeof item === 'string' ? item : item.city}
             </button>
           ))}
         </div>
       </section>
 
-      {/* City editorial */}
+      {/* City editorial (dynamic from destinations) */}
       <section className="scroll-reveal" style={{ background: '#fff' }}>
         <div className="max-w-6xl mx-auto px-6 py-14">
           <h2 style={{ fontWeight: 800, fontSize: 22, color: '#1a1a2e', marginBottom: 4 }}>Car Rental Services Across Pakistan</h2>
           <p style={{ color: '#777', fontSize: 14, marginBottom: 32 }}>Comprehensive car rental solutions in every major city</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {CITY_CONTENT.map(({ city, text }) => (
-              <div key={city} style={{ borderLeft: '3px solid #00c472', paddingLeft: 20 }}>
-                <h3 style={{ fontWeight: 700, fontSize: 16, color: '#1a1a2e', marginBottom: 8 }}>{city}</h3>
-                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.75 }}>{text}</p>
+            {(cityGroups.length ? cityGroups : CITY_CONTENT).slice(0, 6).map((item, idx) => (
+              <div key={item.city || idx} style={{ borderLeft: '3px solid #00c472', paddingLeft: 20 }}>
+                <h3 style={{ fontWeight: 700, fontSize: 16, color: '#1a1a2e', marginBottom: 8 }}>{item.city || item.name || item}</h3>
+                <p style={{ fontSize: 14, color: '#555', lineHeight: 1.75 }}>{
+                  item.outlets ? (
+                    `${item.outlets.length} outlet${item.outlets.length === 1 ? '' : 's'} — ${item.outlets.map(o => o.name).join(', ')}`
+                  ) : (item.tagline || item.text || '')
+                }</p>
               </div>
             ))}
           </div>

@@ -590,6 +590,8 @@ export default function AdminPanel() {
     } catch (err) { setVehicleFormError(err.message) } finally { setVehicleSubmitting(false) }
   }
 
+  
+
   async function handleDeleteVehicle(vehicleId, vehicleName) {
     showConfirm(
       'Delete Vehicle',
@@ -712,6 +714,8 @@ export default function AdminPanel() {
             <OutletsTable outlets={outlets} onEdit={openEditOutletModal} onDeactivate={handleDeactivateOutlet} />
           </DataCard>
         )}
+
+        
 
         {/* Users & Staff Management Tab */}
         {tab === 'users' && (

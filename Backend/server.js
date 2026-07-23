@@ -22,6 +22,7 @@ app.use("/bookings", bookingRoutes)
 app.use("/dashboard", dashboardRoutes)
 app.use("/outlets", outletRoutes)
 app.use("/users", userRoutes)
+// destinations feature removed; cities are derived from outlets
 
 async function startServer() {
   try {

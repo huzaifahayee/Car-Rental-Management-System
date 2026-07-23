@@ -54,6 +54,49 @@ export default function Layout() {
     closeMobileMenu()
   }, [location.pathname])
 
+  // Smooth-scroll to hash targets (e.g. /#destinations) after navigation
+  useEffect(() => {
+    const hash = location.hash
+    if (!hash) return
+    const id = hash.replace('#', '')
+    // slight delay to allow route outlet content to render
+    const t = setTimeout(() => {
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 60)
+    return () => clearTimeout(t)
+  }, [location.pathname, location.hash])
+
+  // If the user refreshed the page while on a hash route, remove the hash from URL (works before router mounts)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.location && window.location.hash) {
+        if (window.history && typeof window.history.replaceState === 'function') {
+          window.history.replaceState(null, '', '/')
+        }
+      }
+    } catch (e) {
+      // ignore - best-effort only
+    }
+    // ensure we're at top of page after reload (override browser restore)
+    try {
+      if (typeof window !== 'undefined') {
+        // immediate attempt
+        window.scrollTo(0, 0)
+        // small delay to override restoration
+        setTimeout(() => {
+          window.scrollTo(0, 0)
+          // one more in next animation frame
+          requestAnimationFrame(() => window.scrollTo(0, 0))
+        }, 60)
+      }
+    } catch (e) {}
+    // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div style={{ fontFamily: "'Inter', 'Nunito', sans-serif", background: '#f5f7fa', minHeight: '100vh' }}>
 
@@ -74,9 +117,9 @@ export default function Layout() {
               <Link to="/admin" style={adminPanelLinkStyle(isAdminRoute)}>Admin Panel</Link>
             ) : (
               <>
-                <a href="#destinations" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</a>
-                <a href="#how-it-works" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</a>
-                <a href="#contact" style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</a>
+                <Link to={'/#destinations'} onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</Link>
+                <Link to={'/#how-it-works'} onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>How It Works</Link>
+                <Link to={'/#contact'} onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Contact</Link>
               </>
             )}
             {user ? (
@@ -142,9 +185,9 @@ export default function Layout() {
             <Link to="/admin" onClick={closeMobileMenu}>Admin Panel</Link>
           ) : (
             <>
-              <a href="/#destinations" onClick={closeMobileMenu}>Destinations</a>
-              <a href="/#how-it-works" onClick={closeMobileMenu}>How It Works</a>
-              <a href="/#contact" onClick={closeMobileMenu}>Contact</a>
+              <Link to={'/#destinations'} onClick={closeMobileMenu}>Destinations</Link>
+              <Link to={'/#how-it-works'} onClick={closeMobileMenu}>How It Works</Link>
+              <Link to={'/#contact'} onClick={closeMobileMenu}>Contact</Link>
             </>
           )}
           {user ? <>{user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}<button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
