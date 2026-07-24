@@ -31,12 +31,28 @@ export default function Layout() {
 
   const closeMobileMenu = () => setMobileOpen(false)
   const closeUserMenu = () => setUserMenuOpen(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   function signOut() {
     logout()
     closeUserMenu()
     closeMobileMenu()
     navigate('/')
+  }
+
+  function requestLogout() {
+    setShowLogoutConfirm(true)
+    closeUserMenu()
+    closeMobileMenu()
+  }
+
+  function cancelLogout() {
+    setShowLogoutConfirm(false)
+  }
+
+  function confirmLogout() {
+    setShowLogoutConfirm(false)
+    signOut()
   }
 
   // Close user menu when clicking outside
@@ -169,7 +185,7 @@ export default function Layout() {
                       </Link>
                     )}
                     <button
-                      onClick={signOut}
+                      onClick={requestLogout}
                       style={{
                         width: '100%', textAlign: 'left', padding: '11px 18px', fontSize: 14,
                         color: '#dc2626', fontWeight: 600, background: 'none', border: 'none',
@@ -194,25 +210,51 @@ export default function Layout() {
             <span /><span /><span />
           </button>
         </div>
-        {mobileOpen && <nav className="mobile-menu" aria-label="Mobile navigation">
-          {isStaffUser ? (
-            <Link to="/admin" onClick={closeMobileMenu}>Admin Panel</Link>
-          ) : (
-            <>
-              <Link to={'/#destinations'} onClick={closeMobileMenu}>Destinations</Link>
-              <Link to={'/#how-it-works'} onClick={closeMobileMenu}>How It Works</Link>
-              <Link to={'/#contact'} onClick={closeMobileMenu}>Contact</Link>
-            </>
-          )}
-          {user ? <>{user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}<button type="button" onClick={signOut}>Logout</button></> : <><Link to="/login" onClick={closeMobileMenu}>Login</Link><Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link></>}
-        </nav>}
+        {mobileOpen && (
+          <nav className="mobile-menu" aria-label="Mobile navigation">
+            {isStaffUser ? (
+              <Link to="/admin" onClick={closeMobileMenu}>Admin Panel</Link>
+            ) : (
+              <>
+                <Link to={'/#destinations'} onClick={closeMobileMenu}>Destinations</Link>
+                <Link to={'/#how-it-works'} onClick={closeMobileMenu}>How It Works</Link>
+                <Link to={'/#contact'} onClick={closeMobileMenu}>Contact</Link>
+              </>
+            )}
+            {user ? (
+              <>
+                {user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}
+                <button type="button" onClick={requestLogout}>Logout</button>
+              </>
+            ) : (
+              <>
+                <Link to="/login" onClick={closeMobileMenu}>Login</Link>
+                <Link className="mobile-register" to="/register" onClick={closeMobileMenu}>Register</Link>
+              </>
+            )}
+          </nav>
+        )}
       </header>
 
       <main key={location.pathname} className="page-transition">
         <Outlet />
       </main>
 
+      {showLogoutConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150, padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 20, padding: '28px 24px', boxShadow: '0 28px 60px rgba(15, 23, 42, 0.18)' }}>
+            <h2 style={{ margin: 0, fontSize: 20, color: '#111827', fontWeight: 800 }}>Confirm logout</h2>
+            <p style={{ margin: '16px 0 0', color: '#4b5563', lineHeight: 1.7 }}>Are you sure you want to log out? You will need to sign in again to access your account.</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 28 }}>
+              <button type="button" onClick={cancelLogout} style={{ background: '#f3f4f6', color: '#374151', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontWeight: 700 }}>Cancel</button>
+              <button type="button" onClick={confirmLogout} style={{ background: 'var(--brand)', color: 'white', border: 'none', borderRadius: 10, padding: '10px 18px', cursor: 'pointer', fontWeight: 700 }}>Logout</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {!isAuthPage && <Footer />}
+
     </div>
   )
 }
