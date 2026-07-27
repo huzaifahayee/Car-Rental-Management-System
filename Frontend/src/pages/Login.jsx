@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { isValidEmail } from '../lib/validation'
@@ -12,6 +12,7 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState({})
 
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
 
   async function handleSubmit(e) {
@@ -35,7 +36,8 @@ export default function Login() {
         body: JSON.stringify({ email: normalizedEmail, password }),
       })
       login(data.token, data.user)
-      navigate('/')
+      const { from, formState } = location.state || {}
+      navigate(from || '/', { state: formState })
     } catch (err) {
       setError(err.message)
     }
@@ -151,7 +153,7 @@ export default function Login() {
 
           <p style={{ textAlign: 'center', fontSize: 14, color: '#666' }}>
             Don't have an account?{' '}
-            <Link to="/register" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to="/register" state={location.state} style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
               Create one
             </Link>
           </p>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { isValidEmail, phoneError, passwordError } from '../lib/validation'
@@ -16,6 +16,7 @@ export default function Register() {
   const [fieldErrors, setFieldErrors] = useState({})
 
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
 
  async function handleSubmit(e) {
@@ -51,7 +52,8 @@ export default function Register() {
         body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, password }),
       })
       login(data.token, data.user)
-      navigate('/')
+      const { from, formState } = location.state || {}
+      navigate(from || '/', { state: formState })
     } catch (err) {
       setError(err.message)
     }
@@ -236,7 +238,7 @@ export default function Register() {
 
           <p style={{ textAlign: 'center', fontSize: 14, color: '#666' }}>
             Already have an account?{' '}
-            <Link to="/login" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
+            <Link to="/login" state={location.state} style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'none' }}>
               Sign in
             </Link>
           </p>

@@ -33,7 +33,6 @@ export default function SearchResults() {
   const [sortBy, setSortBy] = useState('recommended')
   const [withDriverOnly, setWithDriverOnly] = useState(rentalMode === 'WITH_DRIVER')
   const [acOnly, setAcOnly] = useState(false)
-  const [availableOnly, setAvailableOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -47,11 +46,11 @@ export default function SearchResults() {
   }, [])
 
   const filtered = useMemo(() => vehicles
+    .filter(v => v.status === 'AVAILABLE')
     .filter(v => activeCategory === 'all' || v.category.toLowerCase() === activeCategory)
     .filter(v => !withDriverOnly || v.driverOption)
     .filter(v => !acOnly || v.hasAC)
-    .filter(v => !availableOnly || v.status === 'AVAILABLE')
-    .sort((a, b) => sortBy === 'price_asc' ? a.pricePerDay - b.pricePerDay : sortBy === 'price_desc' ? b.pricePerDay - a.pricePerDay : 0), [vehicles, activeCategory, withDriverOnly, acOnly, availableOnly, sortBy])
+    .sort((a, b) => sortBy === 'price_asc' ? a.pricePerDay - b.pricePerDay : sortBy === 'price_desc' ? b.pricePerDay - a.pricePerDay : 0), [vehicles, activeCategory, withDriverOnly, acOnly, sortBy])
 
   function handleBook(vehicleId) {
     navigate(`/book/${vehicleId}`, {
@@ -123,7 +122,6 @@ export default function SearchResults() {
             <p style={filterLabel}>Options</p>
             <FilterToggle label="With Driver" value={withDriverOnly} onChange={setWithDriverOnly} />
             <FilterToggle label="Air Conditioned" value={acOnly} onChange={setAcOnly} />
-            <FilterToggle label="Available Only" value={availableOnly} onChange={setAvailableOnly} />
             <p style={{ ...filterLabel, marginTop: 24 }}>Category</p>
             {CATEGORIES.map(category => (
               <button

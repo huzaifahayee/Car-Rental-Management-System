@@ -84,9 +84,32 @@ export default function BookVehicle() {
     }
   }, [rentalMode, outlets.length, outletId])
 
+  // Send the guest to sign-in/sign-up without losing this page or what
+  // they've already filled in. We hand off:
+  //   - `from`: the exact booking page URL to return to after auth
+  //   - `formState`: everything the user picked so far, in the same shape
+  //     BookVehicle already reads from `location.state` (searchState above)
+  function goToAuth(path) {
+    const formState = {
+      rentalMode,
+      pickupAddress,
+      pickupLat,
+      pickupLng,
+      dropoffAddress,
+      dropoffLat,
+      dropoffLng,
+      outletId,
+      pickupTime: pickupDateTime,
+      returnTime: returnDateTime,
+      paymentMethod,
+      paymentReference,
+    }
+    navigate(path, { state: { from: location.pathname, formState } })
+  }
+
   // Prepare and send booking payload to API
   async function doCreateBooking() {
-    if (!user) return navigate('/login')
+    if (!user) return goToAuth('/login')
     if (user.role !== 'CUSTOMER') return setError('Bookings can only be created from a customer account.')
 
     if (!pickupDateTime || !returnDateTime) return setError('Choose both pickup and return date and time.')
@@ -180,7 +203,7 @@ export default function BookVehicle() {
             {!user ? (
               <>
                 <p style={{ color: '#667085', lineHeight: 1.6 }}>Please sign in with a customer account before confirming this rental.</p>
-                <button onClick={() => navigate('/login')} style={buttonStyle}>Sign in to book</button>
+                <button onClick={() => goToAuth('/login')} style={buttonStyle}>Sign in to book</button>
               </>
             ) : (
               <form onSubmit={(e) => { e.preventDefault(); setShowConfirm(true) }} style={{ display: 'flex', flexDirection: 'column', gap: 15, width: '100%', minWidth: 0 }}>
@@ -321,18 +344,23 @@ export default function BookVehicle() {
     </div>
   )
 }
-
 // Confirmation modal that appears before creating a booking
 function ConfirmModal({ open, onClose, onConfirm, summary, loading }) {
   if (!open) return null
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'grid', placeItems: 'center', zIndex: 60 }}>
       <div style={{ width: 'min(720px, 92%)', background: '#fff', borderRadius: 12, padding: 20 }}>
-        <h3 style={{ margin: '0 0 12px' }}>Confirm booking</h3>
+        <h3 style={{ margin: '0 0 12px', color: 'var(--brand-2)', fontSize: 21, fontWeight: 800, letterSpacing: -0.3 }}>Confirm booking</h3>
         <p style={{ color: '#475467', marginTop: 0 }}>{summary}</p>
-        <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-          <button onClick={onClose} style={{ padding: '10px 14px', borderRadius: 8, background: '#fff', border: '1px solid #e6eef3' }}>Cancel</button>
-          <button onClick={onConfirm} disabled={loading} style={{ padding: '10px 14px', borderRadius: 8, background: 'linear-gradient(90deg, var(--brand), var(--brand-2))', color: 'var(--surface)' }}>{loading ? 'Sending…' : 'Confirm booking'}</button>
+        <div style={{ display: 'flex', gap: 10, marginTop: 18, justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ padding: '12px 16px', borderRadius: 10, background: '#fff', border: '1px solid #e6eef3', fontWeight: 800, cursor: 'pointer' }}>Cancel</button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            style={{ border: 'none', borderRadius: 10, padding: '12px 16px', background: 'linear-gradient(90deg,var(--brand),var(--brand-2))', color: 'var(--surface)', fontWeight: 800, cursor: 'pointer', opacity: loading ? 0.65 : 1 }}
+          >
+            {loading ? 'Sending…' : 'Confirm booking'}
+          </button>
         </div>
       </div>
     </div>
