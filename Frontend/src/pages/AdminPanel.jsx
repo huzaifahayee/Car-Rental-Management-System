@@ -673,41 +673,54 @@ export default function AdminPanel() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <nav style={{ display: 'flex', gap: 4, width: 'fit-content', background: '#fff', borderRadius: 12, padding: 5, marginBottom: 26, boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-          {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
-            <button
-              key={item}
-              onClick={() => setTab(item)}
-              style={{
-                border: 0, borderRadius: 8, padding: '8px 20px', cursor: 'pointer',
-                background: tab === item ? 'var(--brand)' : 'transparent',
-                color: tab === item ? 'var(--surface)' : 'var(--muted)',
-                fontWeight: 800, textTransform: 'capitalize',
-              }}
-            >
-              {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item}
-            </button>
-          ))}
-        </nav>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+          <aside style={{ width: 220 }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+              {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
+                <button
+                  key={item}
+                  onClick={() => setTab(item)}
+                  style={{
+                    display: 'block', width: '100%', textAlign: 'left', border: 0, borderRadius: 8,
+                    padding: '10px 14px', cursor: 'pointer', margin: '6px 0',
+                    background: tab === item ? 'var(--brand)' : 'transparent',
+                    color: tab === item ? 'var(--surface)' : 'var(--muted)',
+                    fontWeight: tab === item ? 900 : 700, textTransform: 'none'
+                  }}
+                >
+                  {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item[0].toUpperCase() + item.slice(1)}
+                </button>
+              ))}
+            </div>
 
-        {tab === 'overview' && (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+            {tab === 'overview' && (
+              <>
+                <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact /></DataCard>
+                <div style={{ height: 24 }} />
+                <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
+              </>
+            )}
+          </aside>
+          <div style={{ flex: 1 }}>
+            {/* Top stats always visible (Revenue card + summary) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-6">
               <Stat label="Total bookings" value={totalBookings} />
               <Stat label="Available vehicles" value={activeVehicles} />
               <Stat label="Pending approvals" value={pendingBookings} />
               <Stat label="Active outlets" value={outlets.filter(o => o.isActive).length} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-4">
               <Stat label="Revenue (30 days)" value={`Rs ${revenue30Days.toLocaleString()}`} highlight />
               <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
               <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
             </div>
-            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact /></DataCard>
-            <div style={{ height: 24 }} />
-            <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
-          </>
-        )}
+
+            {/* Prominent heading for currently selected sidebar item (below revenue card) */}
+            <div style={{ marginBottom: 18 }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a' }}>
+                {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab[0].toUpperCase() + tab.slice(1)}
+              </h2>
+            </div>
 
         {tab === 'themes' && (
           <DataCard title="Themes">
@@ -797,6 +810,8 @@ export default function AdminPanel() {
             />
           </DataCard>
         )}
+          </div>
+        </div>
       </main>
 
       {/* Outlet Modal */}
