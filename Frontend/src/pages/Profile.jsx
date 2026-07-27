@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { phoneError, cnicError, formatCnic } from '../lib/validation'
 
 export default function Profile() {
   const { user, updateUser, loading: authLoading } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
 
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -72,7 +74,14 @@ export default function Profile() {
       setFullName(updated.fullName || '')
       setPhone(updated.phone || '')
       setCnic(updated.cnic ? formatCnic(updated.cnic) : '')
-      setSuccess('Profile updated successfully.')
+      setSuccess('Profile updated successfully. Redirecting…')
+
+      // If we were sent here from another page (e.g. BookVehicle asking for
+      // a missing CNIC), take the user back there. Otherwise, go home.
+      const destination = location.state?.from || '/'
+      setTimeout(() => {
+        navigate(destination, { state: location.state?.formState ? { formState: location.state.formState } : undefined })
+      }, 900)
     } catch (err) {
       setError(err.message)
     } finally {

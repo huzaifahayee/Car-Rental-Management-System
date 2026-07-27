@@ -329,7 +329,7 @@ export default function BookVehicle() {
 
                 {cnicMissing && (
                   <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>
-                    Please add your CNIC to your <Link to="/profile" style={{ color: 'var(--brand)', fontWeight: 700 }}>profile</Link> before booking.
+                    Please add your CNIC to your <Link to="/profile" state={{ from: location.pathname }} style={{ color: 'var(--brand)', fontWeight: 700 }}>profile</Link> before booking.
                   </p>
                 )}
                 {error && <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>{error}</p>}
