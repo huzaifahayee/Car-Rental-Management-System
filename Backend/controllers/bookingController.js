@@ -195,7 +195,7 @@ async function getBookings(req, res) {
       where,
       include: {
         vehiclePackage: true,
-        customer: { select: { fullName: true, phone: true } },
+        customer: { select: { fullName: true, email: true, phone: true, cnic: true } },
         outlet: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -224,7 +224,7 @@ async function updateBookingStatus(req, res) {
         where: { id: Number(req.params.id) },
         data: { status },
         include: {
-          customer: { select: { id: true, fullName: true, email: true, phone: true } },
+          customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
           vehiclePackage: true,
           outlet: true,
         },
@@ -263,7 +263,7 @@ async function cancelBooking(req, res) {
         where: { id },
         data: { status: 'CANCELLED' },
         include: {
-          customer: { select: { id: true, fullName: true, email: true, phone: true } },
+          customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
           vehiclePackage: true,
           outlet: true,
         },

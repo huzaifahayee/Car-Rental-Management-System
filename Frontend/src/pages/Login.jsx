@@ -4,6 +4,8 @@ import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { isValidEmail } from '../lib/validation'
 
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,6 +38,10 @@ export default function Login() {
         body: JSON.stringify({ email: normalizedEmail, password }),
       })
       login(data.token, data.user)
+      if (STAFF_ROLES.includes(data.user.role)) {
+        navigate('/admin')
+        return
+      }
       const { from, formState } = location.state || {}
       navigate(from || '/', { state: formState })
     } catch (err) {

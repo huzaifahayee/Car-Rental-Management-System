@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import ThemeEditor from '../components/ThemeEditor'
+
+const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
 const STATUS_COLORS = {
   PENDING: ['#fef9c3', '#a16207'],
@@ -102,7 +105,7 @@ function buildWhatsAppUrl(phone, message) {
 }
 
 export default function AdminPanel() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [tab, setTab] = useState('overview')
   const [stats, setStats] = useState(null)
   const [bookings, setBookings] = useState([])
@@ -416,6 +419,9 @@ export default function AdminPanel() {
     await handleUpdateBookingStatus(booking.id, newStatus)
   }
 
+  // ---- View booking details (full customer + ride info before approving) ----
+  const [viewBookingModal, setViewBookingModal] = useState(null)
+
   // ---- Cancel Booking (with confirmation modal) ----
   const [cancelBookingModal, setCancelBookingModal] = useState({ show: false, bookingId: null, bookingNumId: null, bookingRef: '', customerName: '', customerPhone: '', vehicleName: '' })
   const [cancellingBooking, setCancellingBooking] = useState(false)
@@ -642,6 +648,8 @@ export default function AdminPanel() {
     )
   }
 
+  if (authLoading) return <PanelState title="Loading dashboard…" />
+  if (!user || !STAFF_ROLES.includes(user.role)) return <Navigate to="/" replace />
   if (loading) return <PanelState title="Loading dashboard…" />
   if (error) return <PanelState title="Dashboard unavailable" text={error} />
 
@@ -693,7 +701,7 @@ export default function AdminPanel() {
               <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
               <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
             </div>
-            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} compact /></DataCard>
+            <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact /></DataCard>
             <div style={{ height: 24 }} />
             <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
           </>
@@ -709,7 +717,7 @@ export default function AdminPanel() {
           </DataCard>
         )}
 
-        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} /></DataCard>}
+        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
         {tab === 'vehicles' && (
           <DataCard
             title={`All vehicles (${vehicles.length})`}
@@ -1413,6 +1421,11 @@ export default function AdminPanel() {
           </div>
         </div>
       )}
+
+      {/* Booking Details Modal — full customer + ride info, useful to review before approving */}
+      {viewBookingModal && (
+        <BookingDetailsModal booking={viewBookingModal} onClose={() => setViewBookingModal(null)} />
+      )}
     </div>
   )
 }
@@ -1452,7 +1465,7 @@ function Badge({ value }) {
   )
 }
 
-function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking, onDeleteBooking }) {
+function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking, onDeleteBooking, onViewDetails }) {
   const canManage = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(currentUser?.role)
 
   return (
@@ -1489,6 +1502,21 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
                 {canManage && (
                   <td style={td}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        onClick={() => onViewDetails(booking)}
+                        style={{
+                          background: '#eef2ff',
+                          color: '#3730a3',
+                          border: '1px solid #c7d2fe',
+                          borderRadius: 6,
+                          padding: '4px 10px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        View Details
+                      </button>
                       {booking.status === 'PENDING' && (
                         <button
                           onClick={() => onStatusChange(booking, 'CONFIRMED')}
@@ -1589,6 +1617,101 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
           )}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+function DetailRow({ label: rowLabel, value }) {
+  if (value === null || value === undefined || value === '') return null
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '7px 0', borderBottom: '1px solid #f1f3f5' }}>
+      <span style={{ color: '#8b95a1', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>{rowLabel}</span>
+      <span style={{ color: '#1a1a2e', fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{value}</span>
+    </div>
+  )
+}
+
+function DetailSection({ title, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <h3 style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: 'var(--brand-2)', textTransform: 'uppercase', letterSpacing: 0.6 }}>{title}</h3>
+      <div>{children}</div>
+    </div>
+  )
+}
+
+function BookingDetailsModal({ booking, onClose }) {
+  const vehicle = booking.vehiclePackage
+  const customer = booking.customer
+
+  return (
+    <div style={{ ...modalOverlayStyle, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+      <div style={{ ...modalCardStyle, maxWidth: 560, maxHeight: '85vh', overflowY: 'auto' }}>
+        <div className="flex justify-between items-center mb-4 pb-3" style={{ borderBottom: '1px solid #e5e7eb' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e', fontWeight: 800 }}>Booking Details</h2>
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#8b95a1' }}>{booking.bookingReference}</p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}
+          >×</button>
+        </div>
+
+        <div className="flex items-center gap-2 mb-5">
+          <Badge value={booking.status} />
+          <span style={{ fontSize: 12, color: '#8b95a1' }}>Booked on {dateTime(booking.createdAt)}</span>
+        </div>
+
+        <DetailSection title="Customer">
+          <DetailRow label="Full Name" value={customer?.fullName} />
+          <DetailRow label="Email" value={customer?.email} />
+          <DetailRow label="Phone" value={customer?.phone} />
+          <DetailRow label="CNIC" value={customer?.cnic || 'Not provided'} />
+        </DetailSection>
+
+        <DetailSection title="Ride">
+          <DetailRow label="Rental Mode" value={booking.rentalMode === 'WITH_DRIVER' ? 'With-Driver' : 'Self-Drive'} />
+          <DetailRow label="Pickup" value={dateTime(booking.pickupDateTime)} />
+          <DetailRow label="Return" value={dateTime(booking.returnDateTime)} />
+          <DetailRow label="Duration" value={`${getBookingDays(booking)} day${getBookingDays(booking) === 1 ? '' : 's'}`} />
+          {booking.rentalMode === 'WITH_DRIVER' ? (
+            <>
+              <DetailRow label="Pickup Address" value={booking.pickupAddress} />
+              <DetailRow label="Dropoff Address" value={booking.dropoffAddress || 'Same as pickup'} />
+            </>
+          ) : (
+            <DetailRow label="Outlet" value={booking.outlet ? `${booking.outlet.name}, ${booking.outlet.city}` : '—'} />
+          )}
+        </DetailSection>
+
+        <DetailSection title="Vehicle">
+          <DetailRow label="Make & Model" value={`${vehicle?.make || ''} ${vehicle?.model || ''}`.trim()} />
+          <DetailRow label="Category" value={vehicle?.category} />
+          <DetailRow label="Seating Capacity" value={vehicle?.seatingCapacity} />
+          <DetailRow label="Transmission" value={vehicle?.transmission ? label(vehicle.transmission) : null} />
+          <DetailRow label="Air Conditioning" value={vehicle?.hasAC ? 'Yes' : 'No'} />
+          <DetailRow label="Driver Option" value={vehicle?.driverOption ? 'Available' : 'Not available'} />
+          <DetailRow label="Route" value={vehicle ? `${vehicle.pickupCity} → ${vehicle.dropoffCity}` : null} />
+          <DetailRow label="Price / Day" value={vehicle ? `Rs ${vehicle.pricePerDay}` : null} />
+        </DetailSection>
+
+        <DetailSection title="Payment">
+          <DetailRow label="Method" value={booking.paymentMethod ? label(booking.paymentMethod) : null} />
+          <DetailRow label="Reference" value={booking.paymentReference || 'Not provided'} />
+          <DetailRow label="Total" value={`Rs ${getBookingTotal(booking)}`} />
+        </DetailSection>
+
+        <div className="flex justify-end mt-4 pt-2" style={{ borderTop: '1px solid #e5e7eb' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
