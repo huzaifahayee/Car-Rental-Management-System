@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Navigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import ThemeEditor from '../components/ThemeEditor'
+import { formatCnic, formatPhone } from '../lib/validation'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
@@ -1643,66 +1645,132 @@ function DetailSection({ title, children }) {
 function BookingDetailsModal({ booking, onClose }) {
   const vehicle = booking.vehiclePackage
   const customer = booking.customer
+  const scrollRef = useRef(null)
+  const footerRef = useRef(null)
+  const [showScrollFade, setShowScrollFade] = useState(false)
+  const [footerHeight, setFooterHeight] = useState(60)
+  const [statusBg, statusColor] = STATUS_COLORS[booking.status] || ['#f3f4f6', '#555']
 
-  return (
+  const checkScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setShowScrollFade(el.scrollHeight - el.scrollTop - el.clientHeight > 4)
+  }
+
+  useEffect(() => {
+    checkScroll()
+    if (footerRef.current) setFooterHeight(footerRef.current.offsetHeight)
+    window.addEventListener('resize', checkScroll)
+    return () => window.removeEventListener('resize', checkScroll)
+  }, [])
+
+  // Lock background scroll while the modal is open, so only the modal's own
+  // content scrolls — the page behind it can't drag the modal around.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [])
+
+  return createPortal(
     <div style={{ ...modalOverlayStyle, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
-      <div style={{ ...modalCardStyle, maxWidth: 560, maxHeight: '85vh', overflowY: 'auto' }}>
-        <div className="flex justify-between items-center mb-4 pb-3" style={{ borderBottom: '1px solid #e5e7eb' }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e', fontWeight: 800 }}>Booking Details</h2>
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: '#8b95a1' }}>{booking.bookingReference}</p>
+      <div style={{ ...modalCardStyle, maxWidth: 560, maxHeight: '85vh', padding: 0, position: 'relative', overflow: 'hidden' }}>
+
+        {/* Single scroll container. Header and footer use position:sticky/absolute inside
+            or over it, so pinning doesn't depend on flex height propagation. */}
+        <div
+          ref={scrollRef}
+          onScroll={checkScroll}
+          style={{ maxHeight: '85vh', overflowY: 'auto' }}
+        >
+          {/* Sticky header: title, reference, close button */}
+          <div style={{ position: 'sticky', top: 0, zIndex: 2, background: '#fff' }}>
+            <div className="flex justify-between items-center" style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb' }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e', fontWeight: 800 }}>Booking Details</h2>
+                <p style={{ margin: '2px 0 0', fontSize: 13, color: '#8b95a1' }}>{booking.bookingReference}</p>
+              </div>
+              <button
+                onClick={onClose}
+                style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}
+              >×</button>
+            </div>
+
+            {/* Highlighted Status + Total strip — the two fields staff scan for first, pinned with the header */}
+            <div style={{ display: 'flex', gap: 12, padding: '14px 24px', background: '#f8f9fb', borderBottom: '1px solid #e5e7eb' }}>
+              <div style={{ flex: 1, background: statusBg, borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: statusColor, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.85 }}>Status</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: statusColor, marginTop: 2 }}>{label(booking.status)}</div>
+              </div>
+              <div style={{ flex: 1, background: '#eef2ff', borderRadius: 10, padding: '10px 14px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-2)', textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.85 }}>Total</div>
+                <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--brand-2)', marginTop: 2 }}>Rs {getBookingTotal(booking)}</div>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#888' }}
-          >×</button>
+
+          <div style={{ padding: '16px 24px', paddingBottom: footerHeight + 16 }}>
+            <div style={{ fontSize: 12, color: '#8b95a1', marginBottom: 14 }}>Booked on {dateTime(booking.createdAt)}</div>
+
+            <DetailSection title="Customer">
+              <DetailRow label="Full Name" value={customer?.fullName} />
+              <DetailRow label="Email" value={customer?.email} />
+              <DetailRow label="Phone" value={customer?.phone ? formatPhone(customer.phone) : null} />
+              <DetailRow label="CNIC" value={customer?.cnic ? formatCnic(customer.cnic) : 'Not provided'} />
+            </DetailSection>
+
+            <DetailSection title="Ride">
+              <DetailRow label="Rental Mode" value={booking.rentalMode === 'WITH_DRIVER' ? 'With-Driver' : 'Self-Drive'} />
+              <DetailRow label="Pickup" value={dateTime(booking.pickupDateTime)} />
+              <DetailRow label="Return" value={dateTime(booking.returnDateTime)} />
+              <DetailRow label="Duration" value={`${getBookingDays(booking)} day${getBookingDays(booking) === 1 ? '' : 's'}`} />
+              {booking.rentalMode === 'WITH_DRIVER' ? (
+                <>
+                  <DetailRow label="Pickup Address" value={booking.pickupAddress} />
+                  <DetailRow label="Dropoff Address" value={booking.dropoffAddress || 'Same as pickup'} />
+                </>
+              ) : (
+                <DetailRow label="Outlet" value={booking.outlet ? `${booking.outlet.name}, ${booking.outlet.city}` : '—'} />
+              )}
+            </DetailSection>
+
+            <DetailSection title="Vehicle">
+              <DetailRow label="Make & Model" value={`${vehicle?.make || ''} ${vehicle?.model || ''}`.trim()} />
+              <DetailRow label="Category" value={vehicle?.category} />
+              <DetailRow label="Seating Capacity" value={vehicle?.seatingCapacity} />
+              <DetailRow label="Transmission" value={vehicle?.transmission ? label(vehicle.transmission) : null} />
+              <DetailRow label="Air Conditioning" value={vehicle?.hasAC ? 'Yes' : 'No'} />
+              <DetailRow label="Driver Option" value={vehicle?.driverOption ? 'Available' : 'Not available'} />
+              <DetailRow label="Route" value={vehicle ? `${vehicle.pickupCity} → ${vehicle.dropoffCity}` : null} />
+              <DetailRow label="Price / Day" value={vehicle ? `Rs ${vehicle.pricePerDay}` : null} />
+            </DetailSection>
+
+            <DetailSection title="Payment">
+              <DetailRow label="Method" value={booking.paymentMethod ? label(booking.paymentMethod) : null} />
+              <DetailRow label="Reference" value={booking.paymentReference || 'Not provided'} />
+            </DetailSection>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 mb-5">
-          <Badge value={booking.status} />
-          <span style={{ fontSize: 12, color: '#8b95a1' }}>Booked on {dateTime(booking.createdAt)}</span>
-        </div>
+        {/* Fade sits just above the footer, hinting there's more to scroll */}
+        {showScrollFade && (
+          <div style={{
+            position: 'absolute', left: 0, right: 0, bottom: footerHeight, height: 30,
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.95))',
+            pointerEvents: 'none',
+          }} />
+        )}
 
-        <DetailSection title="Customer">
-          <DetailRow label="Full Name" value={customer?.fullName} />
-          <DetailRow label="Email" value={customer?.email} />
-          <DetailRow label="Phone" value={customer?.phone} />
-          <DetailRow label="CNIC" value={customer?.cnic || 'Not provided'} />
-        </DetailSection>
-
-        <DetailSection title="Ride">
-          <DetailRow label="Rental Mode" value={booking.rentalMode === 'WITH_DRIVER' ? 'With-Driver' : 'Self-Drive'} />
-          <DetailRow label="Pickup" value={dateTime(booking.pickupDateTime)} />
-          <DetailRow label="Return" value={dateTime(booking.returnDateTime)} />
-          <DetailRow label="Duration" value={`${getBookingDays(booking)} day${getBookingDays(booking) === 1 ? '' : 's'}`} />
-          {booking.rentalMode === 'WITH_DRIVER' ? (
-            <>
-              <DetailRow label="Pickup Address" value={booking.pickupAddress} />
-              <DetailRow label="Dropoff Address" value={booking.dropoffAddress || 'Same as pickup'} />
-            </>
-          ) : (
-            <DetailRow label="Outlet" value={booking.outlet ? `${booking.outlet.name}, ${booking.outlet.city}` : '—'} />
-          )}
-        </DetailSection>
-
-        <DetailSection title="Vehicle">
-          <DetailRow label="Make & Model" value={`${vehicle?.make || ''} ${vehicle?.model || ''}`.trim()} />
-          <DetailRow label="Category" value={vehicle?.category} />
-          <DetailRow label="Seating Capacity" value={vehicle?.seatingCapacity} />
-          <DetailRow label="Transmission" value={vehicle?.transmission ? label(vehicle.transmission) : null} />
-          <DetailRow label="Air Conditioning" value={vehicle?.hasAC ? 'Yes' : 'No'} />
-          <DetailRow label="Driver Option" value={vehicle?.driverOption ? 'Available' : 'Not available'} />
-          <DetailRow label="Route" value={vehicle ? `${vehicle.pickupCity} → ${vehicle.dropoffCity}` : null} />
-          <DetailRow label="Price / Day" value={vehicle ? `Rs ${vehicle.pricePerDay}` : null} />
-        </DetailSection>
-
-        <DetailSection title="Payment">
-          <DetailRow label="Method" value={booking.paymentMethod ? label(booking.paymentMethod) : null} />
-          <DetailRow label="Reference" value={booking.paymentReference || 'Not provided'} />
-          <DetailRow label="Total" value={`Rs ${getBookingTotal(booking)}`} />
-        </DetailSection>
-
-        <div className="flex justify-end mt-4 pt-2" style={{ borderTop: '1px solid #e5e7eb' }}>
+        {/* Footer is pinned to the card's true bottom edge, on top of the scroll container,
+            so Close is always reachable no matter the scroll position. */}
+        <div
+          ref={footerRef}
+          style={{
+            position: 'absolute', left: 0, right: 0, bottom: 0,
+            display: 'flex', justifyContent: 'flex-end', padding: '14px 24px',
+            borderTop: '1px solid #e5e7eb', background: '#fff',
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
@@ -1712,7 +1780,8 @@ function BookingDetailsModal({ booking, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

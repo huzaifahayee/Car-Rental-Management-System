@@ -45,6 +45,19 @@ export function formatCnic(value) {
   return [part1, part2, part3].filter(Boolean).join('-')
 }
 
+// Normalizes a Pakistani mobile number for display, e.g. +923001234567 or 03001234567 -> 0300-1234567
+// Falls back to returning the original value if it doesn't match a recognized format.
+export function formatPhone(value) {
+  if (!value || typeof value !== 'string') return value
+  let digits = value.replace(/[\s()\-]/g, '')
+
+  if (digits.startsWith('+92')) digits = '0' + digits.slice(3)
+  else if (/^92\d{10}$/.test(digits)) digits = '0' + digits.slice(2)
+
+  if (/^03\d{9}$/.test(digits)) return `${digits.slice(0, 4)}-${digits.slice(4)}`
+  return value
+}
+
 export function passwordError(value) {
   if (value.length < 8) return 'Password must be at least 8 characters long.'
   if (value.length > 72) return 'Password must be 72 characters or fewer.'
