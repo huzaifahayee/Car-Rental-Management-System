@@ -218,10 +218,7 @@ export default function AdminPanel() {
   }, [user])
 
   const totalBookings = stats ? Object.values(stats.bookings).reduce((sum, count) => sum + count, 0) : 0
-  const activeVehicles = stats ? stats.vehicles.AVAILABLE : 0
   const pendingBookings = stats ? stats.bookings.PENDING : 0
-  const recentBookings = useMemo(() => bookings.slice(0, 5), [bookings])
-
   // Revenue earned in the last 30 days (CONFIRMED + COMPLETED bookings only)
   const revenue30Days = useMemo(() => {
     const cutoff = new Date()
@@ -652,7 +649,7 @@ export default function AdminPanel() {
   return (
     <div style={{ background: '#f5f7fa', minHeight: '100vh' }}>
       <header style={{ background: '#1a1a2e', padding: '14px 0' }}>
-        <div className="w-full px-6 md:px-10 flex items-center justify-between">
+        <div className="w-full px-4 md:px-6 lg:px-8 flex items-center justify-between">
           <div>
             <h1 style={{ color: '#fff', fontSize: 18, margin: 0 }}>Admin Panel</h1>
             <p style={{ color: '#9ca3af', fontSize: 12, margin: '3px 0 0' }}>Live rental operations</p>
@@ -666,20 +663,21 @@ export default function AdminPanel() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-          <aside style={{ width: 220, flexShrink: 0 }}>
-            <div style={{ background: '#fff', borderRadius: 12, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
+      <main className="w-full px-4 md:px-6 lg:px-8 py-8">
+        <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
+          <aside style={{ width: 260, flexShrink: 0 }}>
+            <div style={{ background: '#fff', borderRadius: 16, padding: '14px 12px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
               {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
                   style={{
-                    display: 'block', width: '100%', textAlign: 'left', border: 0, borderRadius: 8,
-                    padding: '10px 14px', cursor: 'pointer', margin: '6px 0',
+                    display: 'block', width: '100%', textAlign: 'left', border: 0, borderRadius: 10,
+                    padding: '14px 18px', cursor: 'pointer', margin: '8px 0',
                     background: tab === item ? 'var(--brand)' : 'transparent',
                     color: tab === item ? 'var(--surface)' : 'var(--muted)',
-                    fontWeight: tab === item ? 900 : 700, textTransform: 'none'
+                    fontWeight: tab === item ? 900 : 700, fontSize: 15, textTransform: 'none',
+                    transition: 'background 0.15s ease, color 0.15s ease',
                   }}
                 >
                   {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item[0].toUpperCase() + item.slice(1)}
@@ -696,28 +694,14 @@ export default function AdminPanel() {
               </h2>
             </div>
 
-            {/* Top stats always visible (Revenue card + summary) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-5">
-              <Stat label="Total bookings" value={totalBookings} />
-              <Stat label="Available vehicles" value={activeVehicles} />
-              <Stat label="Pending approvals" value={pendingBookings} />
-              <Stat label="Active outlets" value={outlets.filter(o => o.isActive).length} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-              <Stat label="Revenue (30 days)" value={`Rs ${revenue30Days.toLocaleString()}`} highlight />
-              <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
-              <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
-            </div>
-
-            {/* Overview Tab Content - Tables moved into main content area */}
             {tab === 'overview' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-                <DataCard title="Recent bookings">
-                  <BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact />
-                </DataCard>
-                <DataCard title="Vehicle availability">
-                  <VehiclesTable vehicles={vehicles} compact />
-                </DataCard>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
+                <Stat label="Total bookings" value={totalBookings} />
+                <Stat label="Pending approvals" value={pendingBookings} />
+                <Stat label="Active outlets" value={outlets.filter(o => o.isActive).length} />
+                <Stat label="Revenue (30 days)" value={`Rs ${revenue30Days.toLocaleString()}`} highlight />
+                <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
+                <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
               </div>
             )}
 
@@ -1450,11 +1434,15 @@ function Stat({ label: statLabel, value, highlight }) {
     <div style={{
       background: highlight ? 'linear-gradient(135deg, var(--brand) 0%, var(--brand-2) 100%)' : '#fff',
       borderRadius: 14,
-      padding: '20px 22px',
+      padding: '22px 24px',
+      minHeight: 118,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
       boxShadow: highlight ? '0 4px 16px rgba(var(--brand-rgb), .25)' : '0 2px 10px rgba(0,0,0,.05)',
     }}>
-      <p style={{ margin: '0 0 8px', color: highlight ? 'rgba(255,255,255,0.8)' : '#8b95a1', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>{statLabel}</p>
-      <p style={{ margin: 0, fontSize: 27, color: highlight ? '#fff' : '#1a1a2e', fontWeight: 800 }}>{value}</p>
+      <p style={{ margin: '0 0 10px', color: highlight ? 'rgba(255,255,255,0.8)' : '#8b95a1', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.8 }}>{statLabel}</p>
+      <p style={{ margin: 0, fontSize: 26, color: highlight ? '#fff' : '#1a1a2e', fontWeight: 800, lineHeight: 1.2 }}>{value}</p>
     </div>
   )
 }
@@ -1809,7 +1797,10 @@ function VehiclesTable({ vehicles, currentUser, onEdit, onDelete }) {
           </tr>
         </thead>
         <tbody>
-          {vehicles.length ? vehicles.map(vehicle => (
+          {vehicles.length ? vehicles.map(vehicle => {
+            const canDelete = vehicle.status === 'AVAILABLE'
+
+            return (
             <tr key={vehicle.id} style={{ borderTop: '1px solid #f1f3f5' }}>
               <td style={td}>
                 <strong>{vehicle.make} {vehicle.model}</strong>
@@ -1823,24 +1814,29 @@ function VehiclesTable({ vehicles, currentUser, onEdit, onDelete }) {
               <td style={td}><Badge value={vehicle.status} /></td>
               {canManage && (
                 <td style={td}>
-                  <div style={{ display: 'flex', gap: 6 }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                     <button 
                       onClick={() => onEdit(vehicle)} 
                       style={{ background: '#f3f4f6', color: '#333', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                     >
                       Edit
                     </button>
-                    <button 
-                      onClick={() => onDelete(vehicle.id, `${vehicle.make} ${vehicle.model}`)} 
-                      style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Delete
-                    </button>
+                    {canDelete ? (
+                      <button 
+                        onClick={() => onDelete(vehicle.id, `${vehicle.make} ${vehicle.model}`)} 
+                        style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Delete
+                      </button>
+                    ) : (
+                      <span style={{ color: '#98a2b3', fontSize: 12 }}>—</span>
+                    )}
                   </div>
                 </td>
               )}
             </tr>
-          )) : (
+            )
+          }) : (
             <tr><td colSpan={canManage ? 6 : 5} style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No vehicles yet.</td></tr>
           )}
         </tbody>

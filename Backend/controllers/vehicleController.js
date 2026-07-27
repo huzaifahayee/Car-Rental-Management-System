@@ -103,7 +103,28 @@ async function updateVehicle(req, res) {
 
 async function deleteVehicle(req, res) {
   try {
-    await req.prisma.vehiclePackage.delete({ where: { id: Number(req.params.id) } })
+    const vehicle = await req.prisma.vehiclePackage.findUnique({
+      where: { id: Number(req.params.id) },
+    })
+    if (!vehicle) return res.status(404).json({ error: 'Vehicle not found.' })
+
+    if (vehicle.status !== 'AVAILABLE') {
+      return res.status(400).json({
+        error: 'Only available vehicles can be deleted. Booked or unavailable vehicles must stay in the fleet.',
+      })
+    }
+
+    const activeBooking = await req.prisma.booking.findFirst({
+      where: {
+        vehiclePackageId: vehicle.id,
+        status: { in: ['PENDING', 'CONFIRMED'] },
+      },
+    })
+    if (activeBooking) {
+      return res.status(400).json({ error: 'Cannot delete a vehicle with active bookings.' })
+    }
+
+    await req.prisma.vehiclePackage.delete({ where: { id: vehicle.id } })
     res.status(204).send()
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete vehicle', details: err.message })
