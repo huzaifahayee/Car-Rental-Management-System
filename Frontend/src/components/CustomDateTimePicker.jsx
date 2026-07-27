@@ -1,20 +1,55 @@
 import React, { useState, useEffect, useRef } from 'react'
 
+// Round a datetime up to the next 15-minute slot.
+function snapUpTo15(date) {
+  const snapped = new Date(date)
+  const roundedMinutes = Math.ceil(snapped.getMinutes() / 15) * 15
+  if (roundedMinutes === 60) {
+    snapped.setHours(snapped.getHours() + 1)
+    snapped.setMinutes(0, 0, 0)
+  } else {
+    snapped.setMinutes(roundedMinutes, 0, 0)
+  }
+  return snapped
+}
+
+// The real, always-fresh floor for this picker: whichever is LATER of
+// (a) the caller-supplied `min` prop and (b) the actual current time.
+// This matters because callers often compute `min` once at render time
+// (e.g. `new Date().toISOString().slice(0,16)`), which goes stale the
+// moment real time moves past it without a re-render. Re-deriving off
+// `new Date()` here means the picker is never fooled by a stale prop.
+function getEffectiveBoundary(minProp) {
+  const now = new Date()
+  if (!minProp) return now
+  const parsedMin = new Date(minProp)
+  if (isNaN(parsedMin.getTime())) return now
+  return parsedMin > now ? parsedMin : now
+}
+
+// Build the full datetime represented by an hour(12h)/minute/am-pm
+// combination, applied on top of a given base date's year/month/day.
+function buildCandidateTime(baseDate, hourVal, minuteVal, ampmVal) {
+  let h = parseInt(hourVal, 10)
+  if (ampmVal === 'PM' && h < 12) h += 12
+  if (ampmVal === 'AM' && h === 12) h = 0
+  const d = new Date(baseDate)
+  d.setHours(h, minuteVal, 0, 0)
+  return d
+}
+
 export default function CustomDateTimePicker({ value, onChange, min, label = 'Select Date & Time', style }) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
 
-  // Parse current value, or fallback to min, or default to today
-  const parseVal = (valStr, minStr) => {
+  // Parse current value; otherwise default to "now" (or the min floor,
+  // whichever is later), rounded forward to the next 15-minute slot.
+  const parseVal = (valStr, minProp) => {
     if (valStr) {
       const d = new Date(valStr)
       if (!isNaN(d.getTime())) return d
     }
-    if (minStr) {
-      const m = new Date(minStr)
-      if (!isNaN(m.getTime())) return m
-    }
-    return new Date()
+    return snapUpTo15(getEffectiveBoundary(minProp))
   }
 
   const [tempDate, setTempDate] = useState(() => parseVal(value, min))
@@ -95,6 +130,17 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
     next.setFullYear(viewYear)
     next.setMonth(viewMonth)
     next.setDate(day)
+
+    const boundary = getEffectiveBoundary(min)
+    const isMinDay = next.getFullYear() === boundary.getFullYear() &&
+      next.getMonth() === boundary.getMonth() &&
+      next.getDate() === boundary.getDate()
+
+    if (isMinDay && next < boundary) {
+      const snapped = snapUpTo15(boundary)
+      next.setHours(snapped.getHours(), snapped.getMinutes(), 0, 0)
+    }
+
     setTempDate(next)
   }
 
@@ -117,7 +163,9 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
   }
 
   const handleSave = () => {
-    const iso = formatToISOString(tempDate)
+    const boundary = getEffectiveBoundary(min)
+    const finalDate = tempDate < boundary ? snapUpTo15(boundary) : tempDate
+    const iso = formatToISOString(finalDate)
     onChange(iso)
     setIsOpen(false)
   }
@@ -125,7 +173,16 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
   const hour12 = tempDate.getHours() % 12 || 12
   const ampm = tempDate.getHours() >= 12 ? 'PM' : 'AM'
-  const currentMinutes = Math.floor(tempDate.getMinutes() / 5) * 5
+  const currentMinutes = Math.floor(tempDate.getMinutes() / 15) * 15
+  const minBoundary = getEffectiveBoundary(min)
+  const isSameDayAsMin = tempDate.getFullYear() === minBoundary.getFullYear() &&
+    tempDate.getMonth() === minBoundary.getMonth() &&
+    tempDate.getDate() === minBoundary.getDate()
+
+  const isTimeOptionPast = (hourVal, minuteVal, ampmVal) => {
+    if (!isSameDayAsMin) return false
+    return buildCandidateTime(tempDate, hourVal, minuteVal, ampmVal) < minBoundary
+  }
 
   return (
     <div ref={containerRef} style={{ position: 'relative', width: '100%', minWidth: 0, ...style }}>
@@ -178,9 +235,9 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
         >
           {/* Header Month / Year Navigation */}
           {(() => {
-            const minBoundary = min ? new Date(min) : new Date()
-            const isPrevDisabled = (viewYear < minBoundary.getFullYear()) ||
-              (viewYear === minBoundary.getFullYear() && viewMonth <= minBoundary.getMonth())
+            const navBoundary = getEffectiveBoundary(min)
+            const isPrevDisabled = (viewYear < navBoundary.getFullYear()) ||
+              (viewYear === navBoundary.getFullYear() && viewMonth <= navBoundary.getMonth())
 
             return (
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
@@ -235,7 +292,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const dayNum = i + 1
               const thisDate = new Date(viewYear, viewMonth, dayNum, 23, 59, 59)
-              const now = min ? new Date(min) : new Date()
+              const now = getEffectiveBoundary(min)
               // Strip time for day comparison
               const minDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
               const isPast = thisDate < minDay
@@ -278,7 +335,7 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
             >
               {Array.from({ length: 12 }).map((_, i) => {
                 const h = i + 1
-                return <option key={h} value={h}>{String(h).padStart(2, '0')}</option>
+                return <option key={h} value={h} disabled={isTimeOptionPast(h, currentMinutes, ampm)}>{String(h).padStart(2, '0')}</option>
               })}
             </select>
             <span style={{ fontWeight: 700, color: '#667085' }}>:</span>
@@ -287,8 +344,8 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
               onChange={e => handleTimeChange('minute', e.target.value)}
               style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #d0d5dd', fontSize: 13, fontWeight: 600, background: '#f9fafb' }}
             >
-              {[0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].map(m => (
-                <option key={m} value={m}>{String(m).padStart(2, '0')}</option>
+              {[0, 15, 30, 45].map(m => (
+                <option key={m} value={m} disabled={isTimeOptionPast(hour12, m, ampm)}>{String(m).padStart(2, '0')}</option>
               ))}
             </select>
             <select
@@ -296,8 +353,8 @@ export default function CustomDateTimePicker({ value, onChange, min, label = 'Se
               onChange={e => handleTimeChange('ampm', e.target.value)}
               style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #d0d5dd', fontSize: 13, fontWeight: 600, background: '#f9fafb' }}
             >
-              <option value="AM">AM</option>
-              <option value="PM">PM</option>
+              <option value="AM" disabled={isTimeOptionPast(hour12, currentMinutes, 'AM')}>AM</option>
+              <option value="PM" disabled={isTimeOptionPast(hour12, currentMinutes, 'PM')}>PM</option>
             </select>
           </div>
 
