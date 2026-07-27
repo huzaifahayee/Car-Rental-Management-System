@@ -61,6 +61,8 @@ const TRUST_POINTS = [
   { icon: '🔒', title: 'Secure, simple booking', text: 'Your trip details stay protected.' },
 ]
 
+const fieldErrorStyle = { color: '#dc2626', fontSize: 12, fontWeight: 600, margin: '6px 0 0' }
+
 export default function Home() {
   const navigate = useNavigate()
   const { user, loading } = useAuth()
@@ -93,7 +95,7 @@ export default function Home() {
   const [pickupTime, setPickupTime] = useState('')
   const [returnTime, setReturnTime] = useState('')
 
-  const [validationError, setValidationError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState({})
 
   // Fetch active outlets (used across the Home page for city listing)
   useEffect(() => {
@@ -166,48 +168,44 @@ export default function Home() {
   }
 
   function handleSearch() {
-    setValidationError('')
+    const errors = {}
 
     if (rentalMode === 'WITH_DRIVER') {
       if (!pickupAddress.trim()) {
-        setValidationError('Please enter a pickup location.')
-        return
+        errors.pickupAddress = 'Please enter a pickup location.'
       }
     } else {
       if (!selectedOutletId) {
-        setValidationError('Please select an outlet location.')
-        return
+        errors.outlet = 'Please select an outlet location.'
       }
     }
 
     if (!pickupTime) {
-      setValidationError('Please select a pickup date and time.')
-      return
+      errors.pickupTime = 'Please select a pickup date and time.'
+    } else if (isNaN(new Date(pickupTime).getTime())) {
+      errors.pickupTime = 'Please enter a valid pickup date and time.'
     }
 
     if (!returnTime) {
-      setValidationError('Please select a return date and time.')
+      errors.returnTime = 'Please select a return date and time.'
+    } else if (isNaN(new Date(returnTime).getTime())) {
+      errors.returnTime = 'Please enter a valid return date and time.'
+    }
+
+    if (!errors.pickupTime && !errors.returnTime) {
+      const pickupDate = new Date(pickupTime)
+      const returnDate = new Date(returnTime)
+      if (returnDate <= pickupDate) {
+        errors.returnTime = 'Return date and time must be after the pickup date and time.'
+      }
+    }
+
+    if (Object.keys(errors).length) {
+      setFieldErrors(errors)
       return
     }
 
-    const pickupDate = new Date(pickupTime)
-    const returnDate = new Date(returnTime)
-    const now = new Date()
-
-    if (isNaN(pickupDate.getTime())) {
-      setValidationError('Please enter a valid pickup date and time.')
-      return
-    }
-
-    if (isNaN(returnDate.getTime())) {
-      setValidationError('Please enter a valid return date and time.')
-      return
-    }
-
-    if (returnDate <= pickupDate) {
-      setValidationError('Return date and time must be after the pickup date and time.')
-      return
-    }
+    setFieldErrors({})
 
     const selectedOutlet = outlets.find((o) => o.id === Number(selectedOutletId))
 
@@ -348,7 +346,7 @@ export default function Home() {
                 <>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: 1 }}>Pickup Location</label>
-                    <div style={{ border: '1.5px solid #e0e0e0', borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
+                    <div style={{ border: `1.5px solid ${fieldErrors.pickupAddress ? '#dc2626' : '#e0e0e0'}`, borderRadius: 10, padding: '10px 14px', marginTop: 6 }}>
                       <LocationAutocomplete
                         value={pickupAddress}
                         onChange={(text) => setPickupAddress(text)}
@@ -360,6 +358,9 @@ export default function Home() {
                         placeholder="Enter pickup address or landmark"
                       />
                     </div>
+                    {fieldErrors.pickupAddress && (
+                      <p style={fieldErrorStyle}>{fieldErrors.pickupAddress}</p>
+                    )}
                   </div>
 
                   <div>
@@ -410,6 +411,9 @@ export default function Home() {
                         style={{ width: '100%' }}
                       />
                     )}
+                    {fieldErrors.outlet && (
+                      <p style={fieldErrorStyle}>{fieldErrors.outlet}</p>
+                    )}
                   </div>
                 </div>
               )}
@@ -424,6 +428,9 @@ export default function Home() {
                     onChange={val => setPickupTime(val)}
                   />
                 </div>
+                {fieldErrors.pickupTime && (
+                  <p style={fieldErrorStyle}>{fieldErrors.pickupTime}</p>
+                )}
               </div>
 
               <div>
@@ -435,6 +442,9 @@ export default function Home() {
                     onChange={val => setReturnTime(val)}
                   />
                 </div>
+                {fieldErrors.returnTime && (
+                  <p style={fieldErrorStyle}>{fieldErrors.returnTime}</p>
+                )}
               </div>
             </div>
 
@@ -452,12 +462,6 @@ export default function Home() {
                   : 'Self-Drive return to branch'}
               </span>
             </div>
-
-            {validationError && (
-              <p style={{ color: '#c53030', fontSize: 13, fontWeight: 600, marginBottom: 12 }}>
-                {validationError}
-              </p>
-            )}
 
             <button
               className="search-cta"
