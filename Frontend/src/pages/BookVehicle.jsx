@@ -53,6 +53,7 @@ export default function BookVehicle() {
   const [paymentReference, setPaymentReference] = useState('')
 
   const [error, setError] = useState('')
+  const [cnicMissing, setCnicMissing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [booking, setBooking] = useState(null)
@@ -111,6 +112,7 @@ export default function BookVehicle() {
   async function doCreateBooking() {
     if (!user) return goToAuth('/login')
     if (user.role !== 'CUSTOMER') return setError('Bookings can only be created from a customer account.')
+    if (!user.cnic) return setCnicMissing(true)
 
     if (!pickupDateTime || !returnDateTime) return setError('Choose both pickup and return date and time.')
     if (new Date(pickupDateTime) < new Date()) return setError('Pickup date and time cannot be in the past.')
@@ -123,6 +125,7 @@ export default function BookVehicle() {
     }
 
     setError('')
+    setCnicMissing(false)
     setSubmitting(true)
 
     try {
@@ -324,6 +327,11 @@ export default function BookVehicle() {
                   />
                 </Field>
 
+                {cnicMissing && (
+                  <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>
+                    Please add your CNIC to your <Link to="/profile" style={{ color: 'var(--brand)', fontWeight: 700 }}>profile</Link> before booking.
+                  </p>
+                )}
                 {error && <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>{error}</p>}
 
                 <button disabled={submitting} style={{ ...buttonStyle, opacity: submitting ? 0.65 : 1 }}>

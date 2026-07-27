@@ -173,6 +173,15 @@ export default function Layout() {
                     background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
                     border: '1px solid #e8e8e8', minWidth: 180, overflow: 'hidden', zIndex: 100,
                   }}>
+                    <Link
+                      to="/profile"
+                      onClick={closeUserMenu}
+                      style={{ display: 'block', padding: '11px 18px', fontSize: 14, color: '#1a1a2e', textDecoration: 'none', fontWeight: 500 }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#f5f7fa'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      My Profile
+                    </Link>
                     {user.role === 'CUSTOMER' && (
                       <Link
                         to="/my-bookings"
@@ -223,6 +232,7 @@ export default function Layout() {
             )}
             {user ? (
               <>
+                <Link to="/profile" onClick={closeMobileMenu}>My Profile</Link>
                 {user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}
                 <button type="button" onClick={requestLogout}>Logout</button>
               </>

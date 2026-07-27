@@ -33,8 +33,19 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
+  // Merges partial profile updates (e.g. from the Profile page) into the
+  // stored user object, so the nav bar and other consumers stay in sync
+  // without requiring a re-login.
+  function updateUser(partialUserData) {
+    setUser(prev => {
+      const next = { ...prev, ...partialUserData }
+      localStorage.setItem('user', JSON.stringify(next))
+      return next
+    })
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

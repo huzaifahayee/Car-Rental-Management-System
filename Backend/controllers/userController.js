@@ -1,6 +1,19 @@
 const { hashPassword } = require('../utils/auth')
+const { normalizeCnic, isValidCnic } = require('../utils/validators')
 
 const VALID_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE', 'CUSTOMER']
+const NAME_REGEX = /^[\p{L}][\p{L}\s.'-]*$/u
+const PHONE_REGEX = /^(\+92|92|0)3\d{9}$/
+
+const PROFILE_SELECT = {
+  id: true,
+  fullName: true,
+  email: true,
+  phone: true,
+  cnic: true,
+  role: true,
+  createdAt: true,
+}
 
 async function getUsers(req, res) {
   const { role } = req.query
@@ -12,14 +25,7 @@ async function getUsers(req, res) {
   try {
     const users = await req.prisma.user.findMany({
       where,
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: PROFILE_SELECT,
       orderBy: { createdAt: 'desc' },
     })
     res.json(users)
@@ -59,14 +65,7 @@ async function createUser(req, res) {
         passwordHash,
         role,
       },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: PROFILE_SELECT,
     })
 
     res.status(201).json(newUser)
@@ -102,14 +101,7 @@ async function updateUserRole(req, res) {
     const updatedUser = await req.prisma.user.update({
       where: { id: userId },
       data: { role },
-      select: {
-        id: true,
-        fullName: true,
-        email: true,
-        phone: true,
-        role: true,
-        createdAt: true,
-      },
+      select: PROFILE_SELECT,
     })
 
     res.json(updatedUser)
@@ -149,4 +141,84 @@ async function deleteUser(req, res) {
   }
 }
 
-module.exports = { getUsers, createUser, updateUserRole, deleteUser }
+// ── Self-service profile endpoints (any authenticated role: Customer, ──────
+// ── Employee, Admin, SuperAdmin — everyone manages their own profile) ──────
+
+async function getMe(req, res) {
+  try {
+    const me = await req.prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: PROFILE_SELECT,
+    })
+    if (!me) {
+      return res.status(404).json({ error: 'User not found.' })
+    }
+    res.json(me)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch profile', details: err.message })
+  }
+}
+
+async function updateMe(req, res) {
+  const { fullName, phone, cnic } = req.body
+
+  const data = {}
+
+  if (fullName !== undefined) {
+    const trimmedName = fullName.trim().replace(/\s+/g, ' ')
+    if (!trimmedName) {
+      return res.status(400).json({ error: 'Full name cannot be empty.' })
+    }
+    if (trimmedName.length < 2 || trimmedName.length > 100 || !NAME_REGEX.test(trimmedName)) {
+      return res.status(400).json({ error: 'Full name must be 2-100 characters and use letters, spaces, apostrophes, or hyphens only.' })
+    }
+    data.fullName = trimmedName
+  }
+
+  if (phone !== undefined) {
+    const trimmedPhone = phone ? phone.toString().trim() : ''
+    if (!trimmedPhone) {
+      return res.status(400).json({ error: 'Phone number cannot be empty.' })
+    }
+    const strippedPhone = trimmedPhone.replace(/[\s()-]/g, '')
+    if (!PHONE_REGEX.test(strippedPhone)) {
+      return res.status(400).json({ error: 'Enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).' })
+    }
+    data.phone = trimmedPhone
+  }
+
+  if (cnic !== undefined) {
+    const trimmedCnic = cnic ? cnic.toString().trim() : ''
+    if (!trimmedCnic) {
+      return res.status(400).json({ error: 'CNIC cannot be empty.' })
+    }
+    if (!isValidCnic(trimmedCnic)) {
+      return res.status(400).json({ error: 'Enter a valid 13-digit CNIC (e.g. 12345-1234567-1).' })
+    }
+    data.cnic = normalizeCnic(trimmedCnic)
+  }
+
+  if (Object.keys(data).length === 0) {
+    return res.status(400).json({ error: 'Provide at least one field to update: fullName, phone, or cnic.' })
+  }
+
+  try {
+    if (data.cnic) {
+      const existingCnic = await req.prisma.user.findUnique({ where: { cnic: data.cnic } })
+      if (existingCnic && existingCnic.id !== req.user.userId) {
+        return res.status(409).json({ error: 'This CNIC is already registered to another account.' })
+      }
+    }
+
+    const updated = await req.prisma.user.update({
+      where: { id: req.user.userId },
+      data,
+      select: PROFILE_SELECT,
+    })
+    res.json(updated)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update profile', details: err.message })
+  }
+}
+
+module.exports = { getUsers, createUser, updateUserRole, deleteUser, getMe, updateMe }

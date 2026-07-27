@@ -41,6 +41,7 @@ model User {
   fullName     String
   email        String   @unique
   phone        String?
+  cnic         String?  @unique
   passwordHash String
   role         Role
   createdAt    DateTime @default(now())

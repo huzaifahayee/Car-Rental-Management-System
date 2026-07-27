@@ -1,0 +1,742 @@
+diff --git a/Backend/controllers/authController.js b/Backend/controllers/authController.js
+index 955eef8..b16c4fe 100644
+--- a/Backend/controllers/authController.js
++++ b/Backend/controllers/authController.js
+@@ -1,27 +1,41 @@
+ const { hashPassword, comparePassword, signToken } = require('../utils/auth')
++const { normalizeCnic, isValidCnic } = require('../utils/validators')
+ 
+ async function register(req, res) {
+-  const { fullName, email, phone, password } = req.body
++  const { fullName, email, phone, cnic, password } = req.body
+ 
+   if (!fullName || !email || !password) {
+     return res.status(400).json({ error: 'fullName, email, and password are required.' })
+   }
+ 
++  if (!cnic || !cnic.toString().trim()) {
++    return res.status(400).json({ error: 'CNIC is required.' })
++  }
++  if (!isValidCnic(cnic)) {
++    return res.status(400).json({ error: 'Enter a valid 13-digit CNIC (e.g. 12345-1234567-1).' })
++  }
++  const normalizedCnic = normalizeCnic(cnic)
++
+   try {
+-    const existingUser = await req.prisma.user.findUnique({ where: { email } })
+-    if (existingUser) {
++    const existingEmail = await req.prisma.user.findUnique({ where: { email } })
++    if (existingEmail) {
+       return res.status(409).json({ error: 'An account with this email already exists.' })
+     }
+ 
++    const existingCnic = await req.prisma.user.findUnique({ where: { cnic: normalizedCnic } })
++    if (existingCnic) {
++      return res.status(409).json({ error: 'An account with this CNIC already exists.' })
++    }
++
+     const passwordHash = await hashPassword(password)
+     const user = await req.prisma.user.create({
+-      data: { fullName, email, phone, passwordHash, role: 'CUSTOMER' },
++      data: { fullName, email, phone, cnic: normalizedCnic, passwordHash, role: 'CUSTOMER' },
+     })
+     const token = signToken({ userId: user.id, role: user.role, tenantId: req.tenantId })
+ 
+     res.status(201).json({
+       token,
+-      user: { id: user.id, fullName: user.fullName, email: user.email, role: user.role },
++      user: { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone, cnic: user.cnic, role: user.role },
+     })
+   } catch (err) {
+     res.status(500).json({ error: 'Registration failed', details: err.message })
+@@ -49,7 +63,7 @@ async function login(req, res) {
+     const token = signToken({ userId: user.id, role: user.role, tenantId: req.tenantId })
+     res.json({
+       token,
+-      user: { id: user.id, fullName: user.fullName, email: user.email, role: user.role },
++      user: { id: user.id, fullName: user.fullName, email: user.email, phone: user.phone, cnic: user.cnic, role: user.role },
+     })
+   } catch (err) {
+     res.status(500).json({ error: 'Login failed', details: err.message })
+diff --git a/Backend/controllers/bookingController.js b/Backend/controllers/bookingController.js
+index 919aba0..ede5e7e 100644
+--- a/Backend/controllers/bookingController.js
++++ b/Backend/controllers/bookingController.js
+@@ -68,6 +68,18 @@ async function createBooking(req, res) {
+     return res.status(400).json({ error: 'vehiclePackageId, pickupDateTime, returnDateTime, and paymentMethod are required.' })
+   }
+ 
++  // ── CNIC required to book ────────────────────────────────────────────────
++  // Accounts created before this field existed may not have a CNIC yet, so
++  // we check it here rather than at the DB/JWT level, and point the user to
++  // their profile instead of hard-blocking them at login.
++  const requestingUser = await req.prisma.user.findUnique({
++    where: { id: req.user.userId },
++    select: { cnic: true },
++  })
++  if (!requestingUser?.cnic) {
++    return res.status(403).json({ error: 'Please add your CNIC to your profile before booking a vehicle.' })
++  }
++
+   // ── Rental mode validation ──────────────────────────────────────────────
+   if (!rentalMode || !VALID_RENTAL_MODES.includes(rentalMode)) {
+     return res.status(400).json({ error: `rentalMode is required and must be one of: ${VALID_RENTAL_MODES.join(', ')}` })
+diff --git a/Backend/controllers/userController.js b/Backend/controllers/userController.js
+index 049efde..7329396 100644
+--- a/Backend/controllers/userController.js
++++ b/Backend/controllers/userController.js
+@@ -1,6 +1,19 @@
+ const { hashPassword } = require('../utils/auth')
++const { normalizeCnic, isValidCnic } = require('../utils/validators')
+ 
+ const VALID_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE', 'CUSTOMER']
++const NAME_REGEX = /^[\p{L}][\p{L}\s.'-]*$/u
++const PHONE_REGEX = /^(\+92|92|0)3\d{9}$/
++
++const PROFILE_SELECT = {
++  id: true,
++  fullName: true,
++  email: true,
++  phone: true,
++  cnic: true,
++  role: true,
++  createdAt: true,
++}
+ 
+ async function getUsers(req, res) {
+   const { role } = req.query
+@@ -12,14 +25,7 @@ async function getUsers(req, res) {
+   try {
+     const users = await req.prisma.user.findMany({
+       where,
+-      select: {
+-        id: true,
+-        fullName: true,
+-        email: true,
+-        phone: true,
+-        role: true,
+-        createdAt: true,
+-      },
++      select: PROFILE_SELECT,
+       orderBy: { createdAt: 'desc' },
+     })
+     res.json(users)
+@@ -59,14 +65,7 @@ async function createUser(req, res) {
+         passwordHash,
+         role,
+       },
+-      select: {
+-        id: true,
+-        fullName: true,
+-        email: true,
+-        phone: true,
+-        role: true,
+-        createdAt: true,
+-      },
++      select: PROFILE_SELECT,
+     })
+ 
+     res.status(201).json(newUser)
+@@ -102,14 +101,7 @@ async function updateUserRole(req, res) {
+     const updatedUser = await req.prisma.user.update({
+       where: { id: userId },
+       data: { role },
+-      select: {
+-        id: true,
+-        fullName: true,
+-        email: true,
+-        phone: true,
+-        role: true,
+-        createdAt: true,
+-      },
++      select: PROFILE_SELECT,
+     })
+ 
+     res.json(updatedUser)
+@@ -149,4 +141,84 @@ async function deleteUser(req, res) {
+   }
+ }
+ 
+-module.exports = { getUsers, createUser, updateUserRole, deleteUser }
++// ── Self-service profile endpoints (any authenticated role: Customer, ──────
++// ── Employee, Admin, SuperAdmin — everyone manages their own profile) ──────
++
++async function getMe(req, res) {
++  try {
++    const me = await req.prisma.user.findUnique({
++      where: { id: req.user.userId },
++      select: PROFILE_SELECT,
++    })
++    if (!me) {
++      return res.status(404).json({ error: 'User not found.' })
++    }
++    res.json(me)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to fetch profile', details: err.message })
++  }
++}
++
++async function updateMe(req, res) {
++  const { fullName, phone, cnic } = req.body
++
++  const data = {}
++
++  if (fullName !== undefined) {
++    const trimmedName = fullName.trim().replace(/\s+/g, ' ')
++    if (!trimmedName) {
++      return res.status(400).json({ error: 'Full name cannot be empty.' })
++    }
++    if (trimmedName.length < 2 || trimmedName.length > 100 || !NAME_REGEX.test(trimmedName)) {
++      return res.status(400).json({ error: 'Full name must be 2-100 characters and use letters, spaces, apostrophes, or hyphens only.' })
++    }
++    data.fullName = trimmedName
++  }
++
++  if (phone !== undefined) {
++    const trimmedPhone = phone ? phone.toString().trim() : ''
++    if (!trimmedPhone) {
++      return res.status(400).json({ error: 'Phone number cannot be empty.' })
++    }
++    const strippedPhone = trimmedPhone.replace(/[\s()-]/g, '')
++    if (!PHONE_REGEX.test(strippedPhone)) {
++      return res.status(400).json({ error: 'Enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).' })
++    }
++    data.phone = trimmedPhone
++  }
++
++  if (cnic !== undefined) {
++    const trimmedCnic = cnic ? cnic.toString().trim() : ''
++    if (!trimmedCnic) {
++      return res.status(400).json({ error: 'CNIC cannot be empty.' })
++    }
++    if (!isValidCnic(trimmedCnic)) {
++      return res.status(400).json({ error: 'Enter a valid 13-digit CNIC (e.g. 12345-1234567-1).' })
++    }
++    data.cnic = normalizeCnic(trimmedCnic)
++  }
++
++  if (Object.keys(data).length === 0) {
++    return res.status(400).json({ error: 'Provide at least one field to update: fullName, phone, or cnic.' })
++  }
++
++  try {
++    if (data.cnic) {
++      const existingCnic = await req.prisma.user.findUnique({ where: { cnic: data.cnic } })
++      if (existingCnic && existingCnic.id !== req.user.userId) {
++        return res.status(409).json({ error: 'This CNIC is already registered to another account.' })
++      }
++    }
++
++    const updated = await req.prisma.user.update({
++      where: { id: req.user.userId },
++      data,
++      select: PROFILE_SELECT,
++    })
++    res.json(updated)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to update profile', details: err.message })
++  }
++}
++
++module.exports = { getUsers, createUser, updateUserRole, deleteUser, getMe, updateMe }
+diff --git a/Backend/prisma/migrations/20260727090000_add_user_cnic/migration.sql b/Backend/prisma/migrations/20260727090000_add_user_cnic/migration.sql
+new file mode 100644
+index 0000000..fe5932f
+--- /dev/null
++++ b/Backend/prisma/migrations/20260727090000_add_user_cnic/migration.sql
+@@ -0,0 +1,8 @@
++-- AlterTable
++ALTER TABLE "User" ADD COLUMN     "cnic" TEXT;
++
++-- CreateIndex
++-- Nullable + unique: Postgres allows multiple NULLs through a unique index,
++-- so existing users (created before this change) are unaffected until they
++-- add a CNIC via their profile.
++CREATE UNIQUE INDEX "User_cnic_key" ON "User"("cnic");
+diff --git a/Backend/prisma/schema.prisma b/Backend/prisma/schema.prisma
+index 2a8bf9a..3bb6845 100644
+--- a/Backend/prisma/schema.prisma
++++ b/Backend/prisma/schema.prisma
+@@ -41,6 +41,7 @@ model User {
+   fullName     String
+   email        String   @unique
+   phone        String?
++  cnic         String?  @unique
+   passwordHash String
+   role         Role
+   createdAt    DateTime @default(now())
+diff --git a/Backend/routes/users.js b/Backend/routes/users.js
+index bae1251..6c093a0 100644
+--- a/Backend/routes/users.js
++++ b/Backend/routes/users.js
+@@ -1,9 +1,13 @@
+ const express = require('express')
+ const { authenticate, authorize } = require('../middleware/auth')
+-const { getUsers, createUser, updateUserRole, deleteUser } = require('../controllers/userController')
++const { getUsers, createUser, updateUserRole, deleteUser, getMe, updateMe } = require('../controllers/userController')
+ 
+ const router = express.Router()
+ 
++// Self-service profile — any authenticated user (Customer, Employee, Admin, SuperAdmin)
++router.get('/me', authenticate, getMe)
++router.put('/me', authenticate, updateMe)
++
+ router.get('/', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), getUsers)
+ router.post('/', authenticate, authorize('SUPERADMIN', 'ADMIN'), createUser)
+ router.put('/:id/role', authenticate, authorize('SUPERADMIN', 'ADMIN'), updateUserRole)
+diff --git a/Backend/utils/validators.js b/Backend/utils/validators.js
+new file mode 100644
+index 0000000..4902525
+--- /dev/null
++++ b/Backend/utils/validators.js
+@@ -0,0 +1,14 @@
++// Pakistani CNIC: 13 digits, conventionally displayed as 5-7-1 (e.g. 12345-1234567-1).
++// We store the normalized digits-only form and accept either dashed or
++// plain input from clients.
++function normalizeCnic(value) {
++  if (!value || typeof value !== 'string') return ''
++  return value.replace(/-/g, '').trim()
++}
++
++function isValidCnic(value) {
++  const digits = normalizeCnic(value)
++  return /^\d{13}$/.test(digits)
++}
++
++module.exports = { normalizeCnic, isValidCnic }
+diff --git a/Frontend/src/app/routes.jsx b/Frontend/src/app/routes.jsx
+index 98db779..d860a83 100644
+--- a/Frontend/src/app/routes.jsx
++++ b/Frontend/src/app/routes.jsx
+@@ -7,6 +7,7 @@ import Login from '../pages/Login'
+ import Register from '../pages/Register'
+ import BookVehicle from '../pages/BookVehicle'
+ import MyBookings from '../pages/MyBookings'
++import Profile from '../pages/Profile'
+ 
+ export const router = createBrowserRouter([
+   {
+@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
+       { path: 'register', element: <Register /> },
+       { path: 'book/:id', element: <BookVehicle /> },
+       { path: 'my-bookings', element: <MyBookings /> },
++      { path: 'profile', element: <Profile /> },
+     ],
+   },
+ ])
+diff --git a/Frontend/src/components/Layout.jsx b/Frontend/src/components/Layout.jsx
+index 27c533d..033e15a 100644
+--- a/Frontend/src/components/Layout.jsx
++++ b/Frontend/src/components/Layout.jsx
+@@ -173,6 +173,15 @@ export default function Layout() {
+                     background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,0.13)',
+                     border: '1px solid #e8e8e8', minWidth: 180, overflow: 'hidden', zIndex: 100,
+                   }}>
++                    <Link
++                      to="/profile"
++                      onClick={closeUserMenu}
++                      style={{ display: 'block', padding: '11px 18px', fontSize: 14, color: '#1a1a2e', textDecoration: 'none', fontWeight: 500 }}
++                      onMouseEnter={e => e.currentTarget.style.background = '#f5f7fa'}
++                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
++                    >
++                      My Profile
++                    </Link>
+                     {user.role === 'CUSTOMER' && (
+                       <Link
+                         to="/my-bookings"
+@@ -223,6 +232,7 @@ export default function Layout() {
+             )}
+             {user ? (
+               <>
++                <Link to="/profile" onClick={closeMobileMenu}>My Profile</Link>
+                 {user.role === 'CUSTOMER' && <Link to="/my-bookings" onClick={closeMobileMenu}>My Bookings</Link>}
+                 <button type="button" onClick={requestLogout}>Logout</button>
+               </>
+diff --git a/Frontend/src/context/AuthContext.jsx b/Frontend/src/context/AuthContext.jsx
+index c243eb2..206f28a 100644
+--- a/Frontend/src/context/AuthContext.jsx
++++ b/Frontend/src/context/AuthContext.jsx
+@@ -33,8 +33,19 @@ export function AuthProvider({ children }) {
+     setLoading(false)
+   }
+ 
++  // Merges partial profile updates (e.g. from the Profile page) into the
++  // stored user object, so the nav bar and other consumers stay in sync
++  // without requiring a re-login.
++  function updateUser(partialUserData) {
++    setUser(prev => {
++      const next = { ...prev, ...partialUserData }
++      localStorage.setItem('user', JSON.stringify(next))
++      return next
++    })
++  }
++
+   return (
+-    <AuthContext.Provider value={{ user, loading, login, logout }}>
++    <AuthContext.Provider value={{ user, loading, login, logout, updateUser }}>
+       {children}
+     </AuthContext.Provider>
+   )
+@@ -42,4 +53,4 @@ export function AuthProvider({ children }) {
+ 
+ export function useAuth() {
+   return useContext(AuthContext)
+-}
+\ No newline at end of file
++}
+diff --git a/Frontend/src/lib/validation.js b/Frontend/src/lib/validation.js
+index 67c73c9..a37c8e2 100644
+--- a/Frontend/src/lib/validation.js
++++ b/Frontend/src/lib/validation.js
+@@ -24,6 +24,27 @@ export function phoneError(value) {
+   return ''
+ }
+ 
++export function isValidCnic(value) {
++  if (!value || typeof value !== 'string') return false
++  const digits = value.replace(/-/g, '').trim()
++  return /^\d{13}$/.test(digits)
++}
++
++export function cnicError(value) {
++  if (!value || !value.trim()) return 'CNIC is required.'
++  if (!isValidCnic(value)) return 'Enter a valid 13-digit CNIC (e.g. 12345-1234567-1).'
++  return ''
++}
++
++// Formats raw digit input into the conventional 5-7-1 CNIC display, e.g. 12345-1234567-1
++export function formatCnic(value) {
++  const digits = value.replace(/\D/g, '').slice(0, 13)
++  const part1 = digits.slice(0, 5)
++  const part2 = digits.slice(5, 12)
++  const part3 = digits.slice(12, 13)
++  return [part1, part2, part3].filter(Boolean).join('-')
++}
++
+ export function passwordError(value) {
+   if (value.length < 8) return 'Password must be at least 8 characters long.'
+   if (value.length > 72) return 'Password must be 72 characters or fewer.'
+diff --git a/Frontend/src/pages/BookVehicle.jsx b/Frontend/src/pages/BookVehicle.jsx
+index 3c26d24..2c5c839 100644
+--- a/Frontend/src/pages/BookVehicle.jsx
++++ b/Frontend/src/pages/BookVehicle.jsx
+@@ -53,6 +53,7 @@ export default function BookVehicle() {
+   const [paymentReference, setPaymentReference] = useState('')
+ 
+   const [error, setError] = useState('')
++  const [cnicMissing, setCnicMissing] = useState(false)
+   const [loading, setLoading] = useState(true)
+   const [submitting, setSubmitting] = useState(false)
+   const [booking, setBooking] = useState(null)
+@@ -111,6 +112,7 @@ export default function BookVehicle() {
+   async function doCreateBooking() {
+     if (!user) return goToAuth('/login')
+     if (user.role !== 'CUSTOMER') return setError('Bookings can only be created from a customer account.')
++    if (!user.cnic) return setCnicMissing(true)
+ 
+     if (!pickupDateTime || !returnDateTime) return setError('Choose both pickup and return date and time.')
+     if (new Date(pickupDateTime) < new Date()) return setError('Pickup date and time cannot be in the past.')
+@@ -123,6 +125,7 @@ export default function BookVehicle() {
+     }
+ 
+     setError('')
++    setCnicMissing(false)
+     setSubmitting(true)
+ 
+     try {
+@@ -324,6 +327,11 @@ export default function BookVehicle() {
+                   />
+                 </Field>
+ 
++                {cnicMissing && (
++                  <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>
++                    Please add your CNIC to your <Link to="/profile" style={{ color: 'var(--brand)', fontWeight: 700 }}>profile</Link> before booking.
++                  </p>
++                )}
+                 {error && <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>{error}</p>}
+ 
+                 <button disabled={submitting} style={{ ...buttonStyle, opacity: submitting ? 0.65 : 1 }}>
+diff --git a/Frontend/src/pages/Profile.jsx b/Frontend/src/pages/Profile.jsx
+new file mode 100644
+index 0000000..0063080
+--- /dev/null
++++ b/Frontend/src/pages/Profile.jsx
+@@ -0,0 +1,216 @@
++import { useEffect, useState } from 'react'
++import { Navigate } from 'react-router-dom'
++import apiFetch from '../lib/apiClient'
++import { useAuth } from '../context/AuthContext'
++import { phoneError, cnicError, formatCnic } from '../lib/validation'
++
++export default function Profile() {
++  const { user, updateUser, loading: authLoading } = useAuth()
++
++  const [fullName, setFullName] = useState('')
++  const [phone, setPhone] = useState('')
++  const [cnic, setCnic] = useState('')
++
++  const [loading, setLoading] = useState(true)
++  const [saving, setSaving] = useState(false)
++  const [error, setError] = useState('')
++  const [success, setSuccess] = useState('')
++  const [fieldErrors, setFieldErrors] = useState({})
++
++  useEffect(() => {
++    if (!user) return
++    let cancelled = false
++    apiFetch('/users/me')
++      .then(data => {
++        if (cancelled) return
++        setFullName(data.fullName || '')
++        setPhone(data.phone || '')
++        setCnic(data.cnic ? formatCnic(data.cnic) : '')
++      })
++      .catch(err => !cancelled && setError(err.message))
++      .finally(() => !cancelled && setLoading(false))
++    return () => { cancelled = true }
++  }, [user])
++
++  if (authLoading) return null
++  if (!user) return <Navigate to="/login" state={{ from: '/profile' }} replace />
++
++  async function handleSubmit(e) {
++    e.preventDefault()
++    const normalizedName = fullName.trim().replace(/\s+/g, ' ')
++    const normalizedPhone = phone.replace(/[\s()-]/g, '')
++
++    const errors = {}
++    if (!normalizedName) errors.fullName = 'Full name is required.'
++    else if (normalizedName.length < 2 || normalizedName.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(normalizedName)) errors.fullName = 'Use letters, spaces, apostrophes, or hyphens only.'
++    const phoneErr = phoneError(phone)
++    if (phoneErr) errors.phone = phoneErr
++    const cnicErr = cnicError(cnic)
++    if (cnicErr) errors.cnic = cnicErr
++
++    if (Object.keys(errors).length) {
++      setFieldErrors(errors)
++      setError('')
++      setSuccess('')
++      return
++    }
++    setFieldErrors({})
++    setError('')
++    setSuccess('')
++    setSaving(true)
++
++    try {
++      const updated = await apiFetch('/users/me', {
++        method: 'PUT',
++        body: JSON.stringify({
++          fullName: normalizedName,
++          phone: normalizedPhone,
++          cnic: cnic.replace(/-/g, ''),
++        }),
++      })
++      updateUser(updated)
++      setFullName(updated.fullName || '')
++      setPhone(updated.phone || '')
++      setCnic(updated.cnic ? formatCnic(updated.cnic) : '')
++      setSuccess('Profile updated successfully.')
++    } catch (err) {
++      setError(err.message)
++    } finally {
++      setSaving(false)
++    }
++  }
++
++  const inputStyle = {
++    width: '100%', padding: '11px 14px', border: '1.5px solid #e0e0e0',
++    borderRadius: 10, fontSize: 14, color: '#333', outline: 'none',
++    boxSizing: 'border-box', transition: 'border-color 0.15s',
++  }
++  const readOnlyInputStyle = {
++    ...inputStyle, background: '#f5f5f5', color: '#888', cursor: 'not-allowed',
++  }
++  const labelStyle = {
++    fontSize: 12, fontWeight: 700, color: '#555',
++    textTransform: 'uppercase', letterSpacing: 1,
++    display: 'block', marginBottom: 6,
++  }
++
++  function focusHandler(e) { e.currentTarget.style.borderColor = 'var(--brand)' }
++  function blurHandler(e) { e.currentTarget.style.borderColor = '#e0e0e0' }
++
++  return (
++    <div style={{ minHeight: 'calc(100vh - 130px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', background: 'linear-gradient(135deg, #f0fdf7 0%, #e8f8f0 100%)', padding: '40px 16px' }}>
++      <div style={{ width: '100%', maxWidth: 480 }}>
++        <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 8px 40px rgba(0,0,0,0.1)', padding: '40px 36px' }}>
++
++          <div className="mb-8">
++            <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>My Profile</h1>
++            <p style={{ color: '#888', fontSize: 14 }}>Update your details below.</p>
++          </div>
++
++          {!loading && !cnic && (
++            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', color: '#92400e', fontSize: 13, marginBottom: 20 }}>
++              Add your CNIC below — it's required before you can book a vehicle.
++            </div>
++          )}
++
++          {error && (
++            <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 20 }}>
++              {error}
++            </div>
++          )}
++          {success && (
++            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', color: '#15803d', fontSize: 13, marginBottom: 20 }}>
++              {success}
++            </div>
++          )}
++
++          {loading ? (
++            <p style={{ color: '#888', fontSize: 14 }}>Loading your profile…</p>
++          ) : (
++            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
++
++              <div>
++                <label style={labelStyle}>Email Address</label>
++                <input type="email" value={user.email} disabled style={readOnlyInputStyle} />
++              </div>
++
++              <div>
++                <label style={labelStyle}>Role</label>
++                <input type="text" value={user.role} disabled style={readOnlyInputStyle} />
++              </div>
++
++              <div>
++                <label style={labelStyle}>Full Name</label>
++                <input
++                  type="text"
++                  value={fullName}
++                  onChange={e => setFullName(e.target.value)}
++                  autoComplete="name"
++                  required
++                  minLength={2}
++                  maxLength={100}
++                  style={{ ...inputStyle, borderColor: fieldErrors.fullName ? '#dc2626' : '#e0e0e0' }}
++                  onFocus={focusHandler}
++                  onBlur={blurHandler}
++                />
++                {fieldErrors.fullName && <p className="field-error">{fieldErrors.fullName}</p>}
++              </div>
++
++              <div>
++                <label style={labelStyle}>Phone Number</label>
++                <input
++                  type="tel"
++                  value={phone}
++                  onChange={e => setPhone(e.target.value.replace(/[^\d+()\s-]/g, ''))}
++                  placeholder="+92 300 0000000"
++                  autoComplete="tel"
++                  inputMode="tel"
++                  required
++                  maxLength={20}
++                  style={{ ...inputStyle, borderColor: fieldErrors.phone ? '#dc2626' : '#e0e0e0' }}
++                  onFocus={focusHandler}
++                  onBlur={blurHandler}
++                />
++                {fieldErrors.phone && <p className="field-error">{fieldErrors.phone}</p>}
++              </div>
++
++              <div>
++                <label style={labelStyle}>CNIC</label>
++                <input
++                  type="text"
++                  value={cnic}
++                  onChange={e => setCnic(formatCnic(e.target.value))}
++                  placeholder="12345-1234567-1"
++                  autoComplete="off"
++                  inputMode="numeric"
++                  required
++                  maxLength={15}
++                  style={{ ...inputStyle, borderColor: fieldErrors.cnic ? '#dc2626' : '#e0e0e0' }}
++                  onFocus={focusHandler}
++                  onBlur={blurHandler}
++                />
++                {fieldErrors.cnic && <p className="field-error">{fieldErrors.cnic}</p>}
++              </div>
++
++              <button
++                type="submit"
++                disabled={saving}
++                style={{
++                  background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
++                  color: '#fff', border: 'none', borderRadius: 12,
++                  padding: '13px', fontWeight: 800, fontSize: 15,
++                  cursor: saving ? 'default' : 'pointer', marginTop: 4,
++                  boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
++                  opacity: saving ? 0.7 : 1,
++                  transition: 'all 0.2s',
++                }}
++              >
++                {saving ? 'Saving…' : 'Save Changes'}
++              </button>
++            </form>
++          )}
++        </div>
++      </div>
++    </div>
++  )
++}
+diff --git a/Frontend/src/pages/Register.jsx b/Frontend/src/pages/Register.jsx
+index a30d44b..52dd6f9 100644
+--- a/Frontend/src/pages/Register.jsx
++++ b/Frontend/src/pages/Register.jsx
+@@ -2,12 +2,13 @@ import { useState } from 'react'
+ import { Link, useLocation, useNavigate } from 'react-router-dom'
+ import apiFetch from '../lib/apiClient'
+ import { useAuth } from '../context/AuthContext'
+-import { isValidEmail, phoneError, passwordError } from '../lib/validation'
++import { isValidEmail, phoneError, passwordError, cnicError, formatCnic } from '../lib/validation'
+ 
+ export default function Register() {
+   const [fullName, setFullName] = useState('')
+   const [email, setEmail] = useState('')
+   const [phone, setPhone] = useState('')
++  const [cnic, setCnic] = useState('')
+   const [password, setPassword] = useState('')
+   const [confirmPassword, setConfirmPassword] = useState('')
+   const [showPassword, setShowPassword] = useState(false)
+@@ -32,6 +33,8 @@ export default function Register() {
+     else if (!isValidEmail(normalizedEmail)) errors.email = 'Enter a valid email address.'
+     const phoneErr = phoneError(phone)
+     if (phoneErr) errors.phone = phoneErr
++    const cnicErr = cnicError(cnic)
++    if (cnicErr) errors.cnic = cnicErr
+     const invalidPassword = passwordError(password)
+     if (!password) errors.password = 'Password is required.'
+     else if (invalidPassword) errors.password = invalidPassword
+@@ -49,7 +52,7 @@ export default function Register() {
+     try {
+       const data = await apiFetch('/auth/register', {
+         method: 'POST',
+-        body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, password }),
++        body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, cnic: cnic.replace(/-/g, ''), password }),
+       })
+       login(data.token, data.user)
+       const { from, formState } = location.state || {}
+@@ -156,6 +159,24 @@ export default function Register() {
+               {fieldErrors.phone && <p className="field-error">{fieldErrors.phone}</p>}
+             </div>
+ 
++            <div>
++              <label style={labelStyle}>CNIC</label>
++              <input
++                type="text"
++                value={cnic}
++                onChange={e => setCnic(formatCnic(e.target.value))}
++                placeholder="12345-1234567-1"
++                autoComplete="off"
++                inputMode="numeric"
++                required
++                maxLength={15}
++                style={{ ...inputStyle, borderColor: fieldErrors.cnic ? '#dc2626' : '#e0e0e0' }}
++                onFocus={focusHandler}
++                onBlur={blurHandler}
++              />
++              {fieldErrors.cnic && <p className="field-error">{fieldErrors.cnic}</p>}
++            </div>
++
+             <div>
+               <label style={labelStyle}>Password</label>
+               <div style={{ position: 'relative' }}>

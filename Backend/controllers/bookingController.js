@@ -68,6 +68,18 @@ async function createBooking(req, res) {
     return res.status(400).json({ error: 'vehiclePackageId, pickupDateTime, returnDateTime, and paymentMethod are required.' })
   }
 
+  // ── CNIC required to book ────────────────────────────────────────────────
+  // Accounts created before this field existed may not have a CNIC yet, so
+  // we check it here rather than at the DB/JWT level, and point the user to
+  // their profile instead of hard-blocking them at login.
+  const requestingUser = await req.prisma.user.findUnique({
+    where: { id: req.user.userId },
+    select: { cnic: true },
+  })
+  if (!requestingUser?.cnic) {
+    return res.status(403).json({ error: 'Please add your CNIC to your profile before booking a vehicle.' })
+  }
+
   // ── Rental mode validation ──────────────────────────────────────────────
   if (!rentalMode || !VALID_RENTAL_MODES.includes(rentalMode)) {
     return res.status(400).json({ error: `rentalMode is required and must be one of: ${VALID_RENTAL_MODES.join(', ')}` })

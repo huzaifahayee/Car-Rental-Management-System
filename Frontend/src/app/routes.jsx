@@ -7,6 +7,7 @@ import Login from '../pages/Login'
 import Register from '../pages/Register'
 import BookVehicle from '../pages/BookVehicle'
 import MyBookings from '../pages/MyBookings'
+import Profile from '../pages/Profile'
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: 'register', element: <Register /> },
       { path: 'book/:id', element: <BookVehicle /> },
       { path: 'my-bookings', element: <MyBookings /> },
+      { path: 'profile', element: <Profile /> },
     ],
   },
 ])

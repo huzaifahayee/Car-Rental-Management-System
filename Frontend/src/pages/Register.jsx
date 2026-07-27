@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
-import { isValidEmail, phoneError, passwordError } from '../lib/validation'
+import { isValidEmail, phoneError, passwordError, cnicError, formatCnic } from '../lib/validation'
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [cnic, setCnic] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -32,6 +33,8 @@ export default function Register() {
     else if (!isValidEmail(normalizedEmail)) errors.email = 'Enter a valid email address.'
     const phoneErr = phoneError(phone)
     if (phoneErr) errors.phone = phoneErr
+    const cnicErr = cnicError(cnic)
+    if (cnicErr) errors.cnic = cnicErr
     const invalidPassword = passwordError(password)
     if (!password) errors.password = 'Password is required.'
     else if (invalidPassword) errors.password = invalidPassword
@@ -49,7 +52,7 @@ export default function Register() {
     try {
       const data = await apiFetch('/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, password }),
+        body: JSON.stringify({ fullName: normalizedName, email: normalizedEmail, phone: normalizedPhone, cnic: cnic.replace(/-/g, ''), password }),
       })
       login(data.token, data.user)
       const { from, formState } = location.state || {}
@@ -154,6 +157,24 @@ export default function Register() {
                 onBlur={blurHandler}
               />
               {fieldErrors.phone && <p className="field-error">{fieldErrors.phone}</p>}
+            </div>
+
+            <div>
+              <label style={labelStyle}>CNIC</label>
+              <input
+                type="text"
+                value={cnic}
+                onChange={e => setCnic(formatCnic(e.target.value))}
+                placeholder="12345-1234567-1"
+                autoComplete="off"
+                inputMode="numeric"
+                required
+                maxLength={15}
+                style={{ ...inputStyle, borderColor: fieldErrors.cnic ? '#dc2626' : '#e0e0e0' }}
+                onFocus={focusHandler}
+                onBlur={blurHandler}
+              />
+              {fieldErrors.cnic && <p className="field-error">{fieldErrors.cnic}</p>}
             </div>
 
             <div>
