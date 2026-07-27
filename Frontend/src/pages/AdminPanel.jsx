@@ -196,8 +196,6 @@ export default function AdminPanel() {
 
   useEffect(() => {
     if (!user) {
-      // If we are still initializing/loading user from context, don't show error immediately
-      // Wait for localStorage check to complete in AuthProvider
       const token = localStorage.getItem('token')
       if (token) {
         setLoading(true)
@@ -448,7 +446,6 @@ export default function AdminPanel() {
         body: JSON.stringify({ status: 'CANCELLED' }),
       })
 
-      // Open WhatsApp with cancellation apology message
       openWhatsApp(
         cancelBookingModal.customerPhone,
         `Hello *${cancelBookingModal.customerName}*,\n\n` +
@@ -616,7 +613,6 @@ export default function AdminPanel() {
         })
       }
 
-      // If a file is selected, upload it
       if (selectedFile && savedVehicle?.id) {
         const formData = new FormData()
         formData.append('images', selectedFile)
@@ -630,8 +626,6 @@ export default function AdminPanel() {
       reloadData()
     } catch (err) { setVehicleFormError(err.message) } finally { setVehicleSubmitting(false) }
   }
-
-  
 
   async function handleDeleteVehicle(vehicleId, vehicleName) {
     showConfirm(
@@ -674,7 +668,7 @@ export default function AdminPanel() {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-          <aside style={{ width: 220 }}>
+          <aside style={{ width: 220, flexShrink: 0 }}>
             <div style={{ background: '#fff', borderRadius: 12, padding: 8, boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
               {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
                 <button
@@ -692,124 +686,128 @@ export default function AdminPanel() {
                 </button>
               ))}
             </div>
-
-            {tab === 'overview' && (
-              <>
-                <DataCard title="Recent bookings"><BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact /></DataCard>
-                <div style={{ height: 24 }} />
-                <DataCard title="Vehicle availability"><VehiclesTable vehicles={vehicles} compact /></DataCard>
-              </>
-            )}
           </aside>
-          <div style={{ flex: 1 }}>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Prominent heading for currently selected sidebar item moved to TOP */}
+            <div style={{ marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>
+                {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab[0].toUpperCase() + tab.slice(1)}
+              </h2>
+            </div>
+
             {/* Top stats always visible (Revenue card + summary) */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-5">
               <Stat label="Total bookings" value={totalBookings} />
               <Stat label="Available vehicles" value={activeVehicles} />
               <Stat label="Pending approvals" value={pendingBookings} />
               <Stat label="Active outlets" value={outlets.filter(o => o.isActive).length} />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
               <Stat label="Revenue (30 days)" value={`Rs ${revenue30Days.toLocaleString()}`} highlight />
               <Stat label="Confirmed bookings" value={bookings.filter(b => b.status === 'CONFIRMED').length} />
               <Stat label="Completed bookings" value={bookings.filter(b => b.status === 'COMPLETED').length} />
             </div>
 
-            {/* Prominent heading for currently selected sidebar item (below revenue card) */}
-            <div style={{ marginBottom: 18 }}>
-              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: '#0f172a' }}>
-                {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab[0].toUpperCase() + tab.slice(1)}
-              </h2>
-            </div>
-
-        {tab === 'themes' && (
-          <DataCard title="Themes">
-            {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
-              <ThemeEditor />
-            ) : (
-              <p style={{ color: '#64748b', margin: 0 }}>Theme settings are only available for admin roles.</p>
+            {/* Overview Tab Content - Tables moved into main content area */}
+            {tab === 'overview' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                <DataCard title="Recent bookings">
+                  <BookingsTable bookings={recentBookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} compact />
+                </DataCard>
+                <DataCard title="Vehicle availability">
+                  <VehiclesTable vehicles={vehicles} compact />
+                </DataCard>
+              </div>
             )}
-          </DataCard>
-        )}
 
-        {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
-        {tab === 'vehicles' && (
-          <DataCard
-            title={`All vehicles (${vehicles.length})`}
-            action={
-              ['SUPERADMIN', 'ADMIN'].includes(user.role) && (
-                <button
-                  onClick={openCreateVehicleModal}
-                  style={{
-                    background: 'var(--brand)', color: 'var(--surface)', border: 'none',
-                    borderRadius: 8, padding: '8px 16px', fontWeight: 700,
-                    fontSize: 13, cursor: 'pointer',
-                  }}
-                >
-                  + Add Vehicle
-                </button>
-              )
-            }
-          >
-            <VehiclesTable
-              vehicles={vehicles}
-              currentUser={user}
-              onEdit={openEditVehicleModal}
-              onDelete={handleDeleteVehicle}
-            />
-          </DataCard>
-        )}
-        
-        {/* Outlets Management Tab */}
-        {tab === 'outlets' && (
-          <DataCard
-            title={`Branch Outlets (${outlets.length})`}
-            action={
-              <button
-                onClick={openCreateOutletModal}
-                style={{
-                  background: 'var(--brand)', color: 'var(--surface)', border: 'none',
-                  borderRadius: 8, padding: '8px 16px', fontWeight: 700,
-                  fontSize: 13, cursor: 'pointer',
-                }}
+            {tab === 'themes' && (
+              <DataCard title="Themes">
+                {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
+                  <ThemeEditor />
+                ) : (
+                  <p style={{ color: '#64748b', margin: 0 }}>Theme settings are only available for admin roles.</p>
+                )}
+              </DataCard>
+            )}
+
+            {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
+            
+            {tab === 'vehicles' && (
+              <DataCard
+                title={`All vehicles (${vehicles.length})`}
+                action={
+                  ['SUPERADMIN', 'ADMIN'].includes(user.role) && (
+                    <button
+                      onClick={openCreateVehicleModal}
+                      style={{
+                        background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                        borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      + Add Vehicle
+                    </button>
+                  )
+                }
               >
-                + Add Outlet
-              </button>
-            }
-          >
-            <OutletsTable outlets={outlets} onEdit={openEditOutletModal} onDeactivate={handleDeactivateOutlet} />
-          </DataCard>
-        )}
+                <VehiclesTable
+                  vehicles={vehicles}
+                  currentUser={user}
+                  onEdit={openEditVehicleModal}
+                  onDelete={handleDeleteVehicle}
+                />
+              </DataCard>
+            )}
+            
+            {/* Outlets Management Tab */}
+            {tab === 'outlets' && (
+              <DataCard
+                title={`Branch Outlets (${outlets.length})`}
+                action={
+                  <button
+                    onClick={openCreateOutletModal}
+                    style={{
+                      background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                      borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    + Add Outlet
+                  </button>
+                }
+              >
+                <OutletsTable outlets={outlets} onEdit={openEditOutletModal} onDeactivate={handleDeactivateOutlet} />
+              </DataCard>
+            )}
 
-        
-
-        {/* Users & Staff Management Tab */}
-        {tab === 'users' && (
-          <DataCard
-            title={`Users & Staff Accounts (${usersList.length})`}
-            action={
-              ['SUPERADMIN', 'ADMIN'].includes(user.role) && (
-                <button
-                  onClick={openCreateUserModal}
-                  style={{
-                    background: 'var(--brand)', color: 'var(--surface)', border: 'none',
-                    borderRadius: 8, padding: '8px 16px', fontWeight: 700,
-                    fontSize: 13, cursor: 'pointer',
-                  }}
-                >
-                  + Create Staff / Admin User
-                </button>
-              )
-            }
-          >
-            <UsersTable
-              usersList={usersList}
-              currentUser={user}
-              onRoleChange={handleRoleChangeInitiate}
-              onDeleteUser={handleDeleteUserInitiate}
-            />
-          </DataCard>
-        )}
+            {/* Users & Staff Management Tab */}
+            {tab === 'users' && (
+              <DataCard
+                title={`Users & Staff Accounts (${usersList.length})`}
+                action={
+                  ['SUPERADMIN', 'ADMIN'].includes(user.role) && (
+                    <button
+                      onClick={openCreateUserModal}
+                      style={{
+                        background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                        borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      + Create Staff / Admin User
+                    </button>
+                  )
+                }
+              >
+                <UsersTable
+                  usersList={usersList}
+                  currentUser={user}
+                  onRoleChange={handleRoleChangeInitiate}
+                  onDeleteUser={handleDeleteUserInitiate}
+                />
+              </DataCard>
+            )}
           </div>
         </div>
       </main>
@@ -1606,7 +1604,6 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
                           Cancel
                         </button>
                       )}
-                      {/* Admin-only: allow clearing (permanent delete) of cancelled bookings */}
                       {booking.status === 'CANCELLED' && currentUser?.role === 'ADMIN' && (
                         <button
                           onClick={() => onDeleteBooking && onDeleteBooking(booking)}
@@ -1679,8 +1676,6 @@ function BookingDetailsModal({ booking, onClose }) {
     return () => window.removeEventListener('resize', checkScroll)
   }, [])
 
-  // Lock background scroll while the modal is open, so only the modal's own
-  // content scrolls — the page behind it can't drag the modal around.
   useEffect(() => {
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -1691,14 +1686,11 @@ function BookingDetailsModal({ booking, onClose }) {
     <div style={{ ...modalOverlayStyle, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
       <div style={{ ...modalCardStyle, maxWidth: 560, maxHeight: '85vh', padding: 0, position: 'relative', overflow: 'hidden' }}>
 
-        {/* Single scroll container. Header and footer use position:sticky/absolute inside
-            or over it, so pinning doesn't depend on flex height propagation. */}
         <div
           ref={scrollRef}
           onScroll={checkScroll}
           style={{ maxHeight: '85vh', overflowY: 'auto' }}
         >
-          {/* Sticky header: title, reference, close button */}
           <div style={{ position: 'sticky', top: 0, zIndex: 2, background: '#fff' }}>
             <div className="flex justify-between items-center" style={{ padding: '20px 24px 16px', borderBottom: '1px solid #e5e7eb' }}>
               <div>
@@ -1711,7 +1703,6 @@ function BookingDetailsModal({ booking, onClose }) {
               >×</button>
             </div>
 
-            {/* Highlighted Status + Total strip — the two fields staff scan for first, pinned with the header */}
             <div style={{ display: 'flex', gap: 12, padding: '14px 24px', background: '#f8f9fb', borderBottom: '1px solid #e5e7eb' }}>
               <div style={{ flex: 1, background: statusBg, borderRadius: 10, padding: '10px 14px' }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: statusColor, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.85 }}>Status</div>
@@ -1767,7 +1758,6 @@ function BookingDetailsModal({ booking, onClose }) {
           </div>
         </div>
 
-        {/* Fade sits just above the footer, hinting there's more to scroll */}
         {showScrollFade && (
           <div style={{
             position: 'absolute', left: 0, right: 0, bottom: footerHeight, height: 30,
@@ -1776,8 +1766,6 @@ function BookingDetailsModal({ booking, onClose }) {
           }} />
         )}
 
-        {/* Footer is pinned to the card's true bottom edge, on top of the scroll container,
-            so Close is always reachable no matter the scroll position. */}
         <div
           ref={footerRef}
           style={{
@@ -1920,7 +1908,6 @@ function UsersTable({ usersList, currentUser, onRoleChange, onDeleteUser }) {
             const isSuper = u.role === 'SUPERADMIN'
             const isSelf = u.id === currentUser.id
             const canEditThisUser = canManage && (!isSuper || currentUser.role === 'SUPERADMIN') && !isSelf
-            // Admins can delete customers & employees. Superadmins can delete anyone except themselves.
             const canDelete = canManage && !isSelf && (
               currentUser.role === 'SUPERADMIN' ||
               (currentUser.role === 'ADMIN' && (u.role === 'CUSTOMER' || u.role === 'EMPLOYEE'))
