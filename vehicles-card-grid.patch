@@ -1,0 +1,148 @@
+diff --git a/Frontend/src/pages/AdminPanel.jsx b/Frontend/src/pages/AdminPanel.jsx
+index 30cb7c2..7b8f1d0 100644
+--- a/Frontend/src/pages/AdminPanel.jsx
++++ b/Frontend/src/pages/AdminPanel.jsx
+@@ -1790,68 +1790,87 @@ function BookingDetailsModal({ booking, onClose }) {
+ function VehiclesTable({ vehicles, currentUser, onEdit, onDelete }) {
+   const canManage = ['SUPERADMIN', 'ADMIN'].includes(currentUser?.role)
+ 
++  if (!vehicles.length) {
++    return <p style={{ textAlign: 'center', color: '#8b95a1', padding: '24px 0', margin: 0 }}>No vehicles yet.</p>
++  }
++
+   return (
+-    <div style={{ overflowX: 'auto' }}>
+-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+-        <thead>
+-          <tr>
+-            {[
+-              'Vehicle',
+-              'Category',
+-              'Route',
+-              'Price/day',
+-              'Status',
+-              ...(canManage ? ['Actions'] : []),
+-            ].map(heading => (
+-              <th key={heading} style={th}>{heading}</th>
+-            ))}
+-          </tr>
+-        </thead>
+-        <tbody>
+-          {vehicles.length ? vehicles.map(vehicle => {
+-            const canDelete = vehicle.status === 'AVAILABLE'
++    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 18 }}>
++      {vehicles.map(vehicle => {
++        const canDelete = vehicle.status === 'AVAILABLE'
++        const image = vehicle.imageUrls?.[0]
++
++        return (
++          <article key={vehicle.id} style={{
++            background: '#fff',
++            border: '1px solid #eef0f2',
++            borderRadius: 14,
++            overflow: 'hidden',
++            boxShadow: '0 2px 10px rgba(0,0,0,.05)',
++          }}>
++            <div style={{ height: 150, background: '#dce8e4', position: 'relative' }}>
++              {image ? (
++                <img src={image} alt={`${vehicle.make} ${vehicle.model}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
++              ) : (
++                <div style={{ height: '100%', display: 'grid', placeItems: 'center', color: '#527064', fontSize: 12, fontWeight: 700 }}>
++                  No image
++                </div>
++              )}
++              <span style={{ position: 'absolute', top: 10, left: 10, background: '#1a1a2e', color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 20 }}>
++                {label(vehicle.category)}
++              </span>
++              <div style={{ position: 'absolute', top: 10, right: 10 }}>
++                <Badge value={vehicle.status} />
++              </div>
++            </div>
++
++            <div style={{ padding: '14px 16px' }}>
++              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
++                <strong style={{ fontSize: 15, color: '#1a1a2e' }}>{vehicle.make} {vehicle.model}</strong>
++                <strong style={{ color: 'var(--brand-2)', fontSize: 13, whiteSpace: 'nowrap' }}>Rs {vehicle.pricePerDay.toLocaleString()}/day</strong>
++              </div>
++
++              <p style={{ margin: '4px 0 0', color: '#98a2b3', fontSize: 12 }}>
++                {vehicle.pickupCity} → {vehicle.dropoffCity}
++              </p>
++
++              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '10px 0 12px' }}>
++                {[
++                  `${vehicle.seatingCapacity} seats`,
++                  vehicle.transmission.toLowerCase(),
++                  vehicle.hasAC ? 'A/C' : 'No A/C',
++                  vehicle.driverOption ? 'With driver option' : 'Self drive only',
++                ].map(tag => (
++                  <span key={tag} style={{ background: '#f5f7fa', color: '#555', padding: '3px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
++                    {tag}
++                  </span>
++                ))}
++              </div>
+ 
+-            return (
+-            <tr key={vehicle.id} style={{ borderTop: '1px solid #f1f3f5' }}>
+-              <td style={td}>
+-                <strong>{vehicle.make} {vehicle.model}</strong>
+-                <small style={small}>
+-                  {vehicle.seatingCapacity} seats · {vehicle.transmission.toLowerCase()} · {vehicle.hasAC ? 'A/C' : 'No A/C'} · {vehicle.driverOption ? 'With driver option' : 'Self drive only'}
+-                </small>
+-              </td>
+-              <td style={td}>{label(vehicle.category)}</td>
+-              <td style={td}>{vehicle.pickupCity} → {vehicle.dropoffCity}</td>
+-              <td style={td}>Rs {vehicle.pricePerDay.toLocaleString()}</td>
+-              <td style={td}><Badge value={vehicle.status} /></td>
+               {canManage && (
+-                <td style={td}>
+-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+-                    <button 
+-                      onClick={() => onEdit(vehicle)} 
+-                      style={{ background: '#f3f4f6', color: '#333', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
++                <div style={{ display: 'flex', gap: 6, borderTop: '1px solid #f1f3f5', paddingTop: 10 }}>
++                  <button
++                    onClick={() => onEdit(vehicle)}
++                    style={{ flex: 1, background: '#f3f4f6', color: '#333', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
++                  >
++                    Edit
++                  </button>
++                  {canDelete ? (
++                    <button
++                      onClick={() => onDelete(vehicle.id, `${vehicle.make} ${vehicle.model}`)}
++                      style={{ flex: 1, background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                     >
+-                      Edit
++                      Delete
+                     </button>
+-                    {canDelete ? (
+-                      <button 
+-                        onClick={() => onDelete(vehicle.id, `${vehicle.make} ${vehicle.model}`)} 
+-                        style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+-                      >
+-                        Delete
+-                      </button>
+-                    ) : (
+-                      <span style={{ color: '#98a2b3', fontSize: 12 }}>—</span>
+-                    )}
+-                  </div>
+-                </td>
++                  ) : (
++                    <span style={{ flex: 1, textAlign: 'center', color: '#98a2b3', fontSize: 12, alignSelf: 'center' }}>Can't delete (booked)</span>
++                  )}
++                </div>
+               )}
+-            </tr>
+-            )
+-          }) : (
+-            <tr><td colSpan={canManage ? 6 : 5} style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No vehicles yet.</td></tr>
+-          )}
+-        </tbody>
+-      </table>
++            </div>
++          </article>
++        )
++      })}
+     </div>
+   )
+ }
