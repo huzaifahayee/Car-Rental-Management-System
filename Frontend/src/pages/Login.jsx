@@ -61,7 +61,7 @@ export default function Login() {
             <div style={{ background: 'var(--brand)', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <span style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>G</span>
             </div>
-            <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Welcome back</h1>
+            <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Hello!</h1>
             <p style={{ color: '#888', fontSize: 14 }}>Sign in to your account to continue</p>
           </div>
 
@@ -102,7 +102,7 @@ export default function Login() {
                 <label style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase', letterSpacing: 1 }}>
                   Password
                 </label>
-                <a href="#" style={{ fontSize: 13, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}>Forgot password?</a>
+                <a href="#" style={{ fontSize: 13, color: 'var(--brand)', textDecoration: 'none', fontWeight: 600 }}></a>
               </div>
               <div style={{ position: 'relative' }}>
                 <input

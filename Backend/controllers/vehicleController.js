@@ -1,3 +1,4 @@
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload')
 async function reconcileVehicleStatuses(req, res, next) {
   try {
     const confirmedBookings = await req.prisma.booking.findMany({
@@ -135,13 +136,17 @@ async function uploadVehicleImages(req, res) {
     return res.status(400).json({ error: 'No images uploaded.' })
   }
   try {
-    const newUrls = req.files.map((file) => file.path)
+    const uploadResults = await Promise.all(
+      req.files.map((file) => uploadBufferToCloudinary(file.buffer, 'garitrip/vehicles'))
+    )
+    const newUrls = uploadResults.map((result) => result.secure_url)
     const vehicle = await req.prisma.vehiclePackage.update({
       where: { id: Number(req.params.id) },
       data: { imageUrls: { push: newUrls } },
     })
     res.json(vehicle)
   } catch (err) {
+    console.error('Vehicle image upload failed:', err)
     res.status(500).json({ error: 'Failed to upload images', details: err.message })
   }
 }

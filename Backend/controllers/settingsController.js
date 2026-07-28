@@ -1,3 +1,5 @@
+const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload')
+
 async function getSettings(req, res) {
   try {
     const settings = await req.prisma.settings.findFirst()
@@ -30,7 +32,8 @@ async function uploadLogo(req, res) {
     return res.status(400).json({ error: 'No logo file uploaded.' })
   }
   try {
-    const logoUrl = req.file.path
+    const result = await uploadBufferToCloudinary(req.file.buffer, 'garitrip/branding')
+    const logoUrl = result.secure_url
     const existing = await req.prisma.settings.findFirst()
     const settings = existing
       ? await req.prisma.settings.update({ where: { id: existing.id }, data: { logoUrl } })
@@ -39,6 +42,7 @@ async function uploadLogo(req, res) {
       })
     res.json(settings)
   } catch (err) {
+    console.error('Logo upload failed:', err)
     res.status(500).json({ error: 'Failed to upload logo', details: err.message })
   }
 }
