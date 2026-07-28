@@ -146,7 +146,7 @@ export default function Layout() {
             </div>
             <div>
               <div style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e', lineHeight: 1.1 }}>{agencyName}</div>
-              <div style={{ fontSize: 11, color: '#888', fontWeight: 500 }}>Car Rental & Hotel Booking</div>
+              <div style={{ fontSize: 11, color: '#888', fontWeight: 500 }}>Car Rental & Bookings</div>
             </div>
           </Link>
 
