@@ -649,7 +649,10 @@ export default function AdminPanel() {
 
   return (
     <div style={{ background: '#f5f7fa', minHeight: '100vh' }}>
-      <header style={{ background: '#1a1a2e', padding: '14px 0' }}>
+     <header style={{
+        background: 'linear-gradient(120deg, #003d24 0%, #00693b 100%)',
+        padding: '14px 0',
+      }}>
         <div className="w-full px-4 md:px-6 lg:px-8 flex items-center justify-between">
           <div>
             <h1 style={{ color: '#fff', fontSize: 18, margin: 0 }}>Admin Panel</h1>
