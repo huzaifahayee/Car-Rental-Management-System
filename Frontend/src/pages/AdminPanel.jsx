@@ -717,6 +717,14 @@ export default function AdminPanel() {
 )}
 
 {tab === 'themes' && (
+              <DataCard title="Themes">
+                {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
+                  <ThemeEditor />
+                ) : (
+                  <p style={{ color: '#64748b', margin: 0 }}>Theme settings are only available for admin roles.</p>
+                )}
+              </DataCard>
+            )}
 
             {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
             
