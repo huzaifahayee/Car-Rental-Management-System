@@ -1,7 +1,7 @@
 async function getPublicStats(req, res) {
   try {
     // total vehicle packages (used as 'Car Vendors' approximate)
-    const vehiclesCount = await req.prisma.vehiclePackage.count()
+    const vehiclesCount = await req.prisma.vehiclePackage.count({ where: { isArchived: false } })
 
     // distinct cities covered (groupBy city)
     const cityGroups = await req.prisma.outlet.groupBy({ by: ['city'] })

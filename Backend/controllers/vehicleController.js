@@ -22,7 +22,7 @@ async function getVehicles(req, res) {
   await reconcileVehicleStatuses(req, res, () => {})
   const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status, sort } = req.query
 
-  const where = {}
+  const where = { isArchived: false }
 
   if (pickupCity) where.pickupCity = pickupCity
   if (category) where.category = category
@@ -59,7 +59,7 @@ async function getVehicleById(req, res) {
 }
 
 async function createVehicle(req, res) {
-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrls } = req.body
+  const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrls } = req.body
   if (!category || !make || !model || !seatingCapacity || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
     return res.status(400).json({ error: 'Missing required vehicle fields.' })
   }
@@ -69,6 +69,9 @@ async function createVehicle(req, res) {
         category,
         make,
         model,
+        variant: variant || null,
+        year: year != null ? Number(year) : null,
+        registrationPlate: registrationPlate || null,
         seatingCapacity,
         transmission,
         hasAC,
@@ -86,9 +89,15 @@ async function createVehicle(req, res) {
 }
 
 async function updateVehicle(req, res) {
-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
+  const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
   try {
-    const updateData = { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status }
+    const updateData = {
+      category, make, model,
+      variant: variant !== undefined ? (variant || null) : undefined,
+      year: year !== undefined ? (year != null ? Number(year) : null) : undefined,
+      registrationPlate: registrationPlate !== undefined ? (registrationPlate || null) : undefined,
+      seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status,
+    }
     if (Array.isArray(imageUrls)) {
       updateData.imageUrls = imageUrls
     }
@@ -125,7 +134,10 @@ async function deleteVehicle(req, res) {
       return res.status(400).json({ error: 'Cannot delete a vehicle with active bookings.' })
     }
 
-    await req.prisma.vehiclePackage.delete({ where: { id: vehicle.id } })
+    await req.prisma.vehiclePackage.update({
+      where: { id: vehicle.id },
+      data: { isArchived: true },
+    })
     res.status(204).send()
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete vehicle', details: err.message })

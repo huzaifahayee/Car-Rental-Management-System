@@ -1,0 +1,50 @@
+diff --git a/Backend/controllers/publicController.js b/Backend/controllers/publicController.js
+index 26bedfa..e7c840d 100644
+--- a/Backend/controllers/publicController.js
++++ b/Backend/controllers/publicController.js
+@@ -1,7 +1,7 @@
+ async function getPublicStats(req, res) {
+   try {
+     // total vehicle packages (used as 'Car Vendors' approximate)
+-    const vehiclesCount = await req.prisma.vehiclePackage.count()
++    const vehiclesCount = await req.prisma.vehiclePackage.count({ where: { isArchived: false } })
+ 
+     // distinct cities covered (groupBy city)
+     const cityGroups = await req.prisma.outlet.groupBy({ by: ['city'] })
+diff --git a/Backend/controllers/vehicleController.js b/Backend/controllers/vehicleController.js
+index 4a3ecd2..7122f8b 100644
+--- a/Backend/controllers/vehicleController.js
++++ b/Backend/controllers/vehicleController.js
+@@ -22,7 +22,7 @@ async function getVehicles(req, res) {
+   await reconcileVehicleStatuses(req, res, () => {})
+   const { pickupCity, category, transmission, hasAC, minPrice, maxPrice, status, sort } = req.query
+ 
+-  const where = {}
++  const where = { isArchived: false }
+ 
+   if (pickupCity) where.pickupCity = pickupCity
+   if (category) where.category = category
+@@ -125,7 +125,10 @@ async function deleteVehicle(req, res) {
+       return res.status(400).json({ error: 'Cannot delete a vehicle with active bookings.' })
+     }
+ 
+-    await req.prisma.vehiclePackage.delete({ where: { id: vehicle.id } })
++    await req.prisma.vehiclePackage.update({
++      where: { id: vehicle.id },
++      data: { isArchived: true },
++    })
+     res.status(204).send()
+   } catch (err) {
+     res.status(500).json({ error: 'Failed to delete vehicle', details: err.message })
+diff --git a/Backend/prisma/schema.prisma b/Backend/prisma/schema.prisma
+index 1f9963c..aef3983 100644
+--- a/Backend/prisma/schema.prisma
++++ b/Backend/prisma/schema.prisma
+@@ -62,6 +62,7 @@ model VehiclePackage {
+   pickupCity    String
+   dropoffCity   String
+   status        VehicleStatus @default(AVAILABLE)
++  isArchived    Boolean      @default(false)
+   createdAt     DateTime     @default(now())
+   imageUrls String[] @default([])
+ 

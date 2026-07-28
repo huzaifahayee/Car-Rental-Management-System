@@ -1,0 +1,515 @@
+From d6fda345f58e1d1096ecb3534e625f510932bbfb Mon Sep 17 00:00:00 2001
+From: GariTrip Dev <dev@garitrip.local>
+Date: Tue, 28 Jul 2026 08:47:01 +0000
+Subject: [PATCH] Add With-Driver stage 1: driver model, vehicle detail fields,
+ overlap-based assignment
+
+- Add Driver model (fullName, phone, status) and DriverStatus enum
+- Add variant/year/registrationPlate to VehiclePackage (nullable, backward compat)
+- Wire driverId onto Booking (nullable, assigned post-creation by an admin)
+- Shared overlap-based driver-availability logic in utils/driverAvailability.js,
+  used by both GET /drivers?available=true and booking driver assignment
+- New driverController.js + routes/drivers.js (admin/employee only), reusing
+  userController's name/phone validation conventions
+- New PUT /bookings/:id/assign-driver endpoint with real overlap checking
+  (checks against PENDING/CONFIRMED bookings, excluding the booking itself)
+- vehicleController create/update accept the new vehicle detail fields
+---
+ Backend/controllers/bookingController.js      |  54 ++++++-
+ Backend/controllers/driverController.js       | 138 ++++++++++++++++++
+ Backend/controllers/vehicleController.js      |  15 +-
+ .../migration.sql                             |  27 ++++
+ Backend/prisma/schema.prisma                  |  23 +++
+ Backend/routes/bookings.js                    |   4 +-
+ Backend/routes/drivers.js                     |  19 +++
+ Backend/server.js                             |   2 +
+ Backend/utils/driverAvailability.js           |  39 +++++
+ 9 files changed, 316 insertions(+), 5 deletions(-)
+ create mode 100644 Backend/controllers/driverController.js
+ create mode 100644 Backend/prisma/migrations/20260728120000_add_drivers_and_vehicle_details/migration.sql
+ create mode 100644 Backend/routes/drivers.js
+ create mode 100644 Backend/utils/driverAvailability.js
+
+diff --git a/Backend/controllers/bookingController.js b/Backend/controllers/bookingController.js
+index edbf2df..d77d16e 100644
+--- a/Backend/controllers/bookingController.js
++++ b/Backend/controllers/bookingController.js
+@@ -1,5 +1,6 @@
+ const crypto = require('crypto')
+ const { geocodeAddress, validateCoordinates } = require('../utils/geocoding')
++const { isDriverAvailable } = require('../utils/driverAvailability')
+ 
+ function generateBookingReference() {
+   return `GT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
+@@ -197,6 +198,7 @@ async function getBookings(req, res) {
+         vehiclePackage: true,
+         customer: { select: { fullName: true, email: true, phone: true, cnic: true } },
+         outlet: true,
++        driver: true,
+       },
+       orderBy: { createdAt: 'desc' },
+     })
+@@ -227,6 +229,7 @@ async function updateBookingStatus(req, res) {
+           customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
+           vehiclePackage: true,
+           outlet: true,
++          driver: true,
+         },
+       }),
+       req.prisma.vehiclePackage.update({
+@@ -266,6 +269,7 @@ async function cancelBooking(req, res) {
+           customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
+           vehiclePackage: true,
+           outlet: true,
++          driver: true,
+         },
+       }),
+       req.prisma.vehiclePackage.update({
+@@ -280,6 +284,54 @@ async function cancelBooking(req, res) {
+   }
+ }
+ 
++async function assignDriver(req, res) {
++  const { driverId } = req.body
++  const id = Number(req.params.id)
++
++  if (!driverId) {
++    return res.status(400).json({ error: 'driverId is required.' })
++  }
++
++  try {
++    const booking = await req.prisma.booking.findUnique({ where: { id } })
++    if (!booking) return res.status(404).json({ error: 'Booking not found.' })
++
++    if (booking.rentalMode !== 'WITH_DRIVER') {
++      return res.status(400).json({ error: 'A driver can only be assigned to With-Driver bookings.' })
++    }
++    if (['CANCELLED', 'COMPLETED'].includes(booking.status)) {
++      return res.status(400).json({ error: `Cannot assign a driver to a booking with status ${booking.status}.` })
++    }
++
++    const driver = await req.prisma.driver.findUnique({ where: { id: Number(driverId) } })
++    if (!driver) return res.status(404).json({ error: 'Driver not found.' })
++    if (driver.status !== 'ACTIVE') {
++      return res.status(409).json({ error: 'This driver is not active.' })
++    }
++
++    // Real overlap check — excludes this booking itself so re-confirming the
++    // same driver on the same booking doesn't false-positive against itself.
++    const available = await isDriverAvailable(req.prisma, driver.id, booking.pickupDateTime, booking.returnDateTime, booking.id)
++    if (!available) {
++      return res.status(409).json({ error: 'This driver is already assigned to an overlapping booking.' })
++    }
++
++    const updated = await req.prisma.booking.update({
++      where: { id },
++      data: { driverId: driver.id },
++      include: {
++        customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
++        vehiclePackage: true,
++        outlet: true,
++        driver: true,
++      },
++    })
++    res.json(updated)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to assign driver', details: err.message })
++  }
++}
++
+ async function deleteBooking(req, res) {
+   try {
+     const id = Number(req.params.id)
+@@ -298,4 +350,4 @@ async function deleteBooking(req, res) {
+   }
+ }
+ 
+-module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking }
++module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking, assignDriver }
+diff --git a/Backend/controllers/driverController.js b/Backend/controllers/driverController.js
+new file mode 100644
+index 0000000..db9b2c4
+--- /dev/null
++++ b/Backend/controllers/driverController.js
+@@ -0,0 +1,138 @@
++const { getBusyDriverIds } = require('../utils/driverAvailability')
++
++// Same conventions as userController.js's fullName/phone validation
++const NAME_REGEX = /^[\p{L}][\p{L}\s.'-]*$/u
++const PHONE_REGEX = /^(\+92|92|0)3\d{9}$/
++const VALID_STATUSES = ['ACTIVE', 'INACTIVE']
++
++function validateDriverPayload({ fullName, phone }) {
++  const errors = []
++
++  if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
++    errors.push('Full name is required.')
++  } else {
++    const trimmedName = fullName.trim().replace(/\s+/g, ' ')
++    if (trimmedName.length < 2 || trimmedName.length > 100 || !NAME_REGEX.test(trimmedName)) {
++      errors.push('Full name must be 2-100 characters and use letters, spaces, apostrophes, or hyphens only.')
++    }
++  }
++
++  if (!phone || typeof phone !== 'string' || !phone.trim()) {
++    errors.push('Phone number is required.')
++  } else {
++    const strippedPhone = phone.trim().replace(/[\s()-]/g, '')
++    if (!PHONE_REGEX.test(strippedPhone)) {
++      errors.push('Enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).')
++    }
++  }
++
++  return errors
++}
++
++async function getDrivers(req, res) {
++  const { status, available, pickupDateTime, returnDateTime } = req.query
++
++  const where = {}
++  if (status && VALID_STATUSES.includes(status)) where.status = status
++
++  try {
++    let drivers = await req.prisma.driver.findMany({ where, orderBy: { createdAt: 'desc' } })
++
++    if (available === 'true') {
++      if (!pickupDateTime || !returnDateTime) {
++        return res.status(400).json({ error: 'pickupDateTime and returnDateTime are required to filter by availability.' })
++      }
++      const busyDriverIds = await getBusyDriverIds(req.prisma, pickupDateTime, returnDateTime)
++      drivers = drivers.filter((driver) => driver.status === 'ACTIVE' && !busyDriverIds.has(driver.id))
++    }
++
++    res.json(drivers)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to fetch drivers', details: err.message })
++  }
++}
++
++async function getDriverById(req, res) {
++  try {
++    const driver = await req.prisma.driver.findUnique({ where: { id: Number(req.params.id) } })
++    if (!driver) return res.status(404).json({ error: 'Driver not found.' })
++    res.json(driver)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to fetch driver', details: err.message })
++  }
++}
++
++async function createDriver(req, res) {
++  const { fullName, phone } = req.body
++
++  const errors = validateDriverPayload({ fullName, phone })
++  if (errors.length > 0) {
++    return res.status(400).json({ error: errors.join(' ') })
++  }
++
++  try {
++    const driver = await req.prisma.driver.create({
++      data: {
++        fullName: fullName.trim().replace(/\s+/g, ' '),
++        phone: phone.trim(),
++      },
++    })
++    res.status(201).json(driver)
++  } catch (err) {
++    res.status(500).json({ error: 'Failed to create driver', details: err.message })
++  }
++}
++
++async function updateDriver(req, res) {
++  const { fullName, phone, status } = req.body
++
++  const errors = validateDriverPayload({ fullName, phone })
++  if (errors.length > 0) {
++    return res.status(400).json({ error: errors.join(' ') })
++  }
++
++  if (status !== undefined && !VALID_STATUSES.includes(status)) {
++    return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` })
++  }
++
++  try {
++    const driver = await req.prisma.driver.update({
++      where: { id: Number(req.params.id) },
++      data: {
++        fullName: fullName.trim().replace(/\s+/g, ' '),
++        phone: phone.trim(),
++        ...(status !== undefined ? { status } : {}),
++      },
++    })
++    res.json(driver)
++  } catch (err) {
++    if (err.code === 'P2025') {
++      return res.status(404).json({ error: 'Driver not found.' })
++    }
++    res.status(500).json({ error: 'Failed to update driver', details: err.message })
++  }
++}
++
++async function deleteDriver(req, res) {
++  try {
++    const activeAssignment = await req.prisma.booking.findFirst({
++      where: {
++        driverId: Number(req.params.id),
++        status: { in: ['PENDING', 'CONFIRMED'] },
++      },
++    })
++    if (activeAssignment) {
++      return res.status(400).json({ error: 'Cannot delete a driver with active booking assignments. Set them to inactive instead.' })
++    }
++
++    await req.prisma.driver.delete({ where: { id: Number(req.params.id) } })
++    res.status(204).send()
++  } catch (err) {
++    if (err.code === 'P2025') {
++      return res.status(404).json({ error: 'Driver not found.' })
++    }
++    res.status(500).json({ error: 'Failed to delete driver', details: err.message })
++  }
++}
++
++module.exports = { getDrivers, getDriverById, createDriver, updateDriver, deleteDriver }
+diff --git a/Backend/controllers/vehicleController.js b/Backend/controllers/vehicleController.js
+index 4a3ecd2..812e41c 100644
+--- a/Backend/controllers/vehicleController.js
++++ b/Backend/controllers/vehicleController.js
+@@ -59,7 +59,7 @@ async function getVehicleById(req, res) {
+ }
+ 
+ async function createVehicle(req, res) {
+-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrls } = req.body
++  const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrls } = req.body
+   if (!category || !make || !model || !seatingCapacity || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
+     return res.status(400).json({ error: 'Missing required vehicle fields.' })
+   }
+@@ -69,6 +69,9 @@ async function createVehicle(req, res) {
+         category,
+         make,
+         model,
++        variant: variant || null,
++        year: year != null ? Number(year) : null,
++        registrationPlate: registrationPlate || null,
+         seatingCapacity,
+         transmission,
+         hasAC,
+@@ -86,9 +89,15 @@ async function createVehicle(req, res) {
+ }
+ 
+ async function updateVehicle(req, res) {
+-  const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
++  const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
+   try {
+-    const updateData = { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status }
++    const updateData = {
++      category, make, model,
++      variant: variant !== undefined ? (variant || null) : undefined,
++      year: year !== undefined ? (year != null ? Number(year) : null) : undefined,
++      registrationPlate: registrationPlate !== undefined ? (registrationPlate || null) : undefined,
++      seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status,
++    }
+     if (Array.isArray(imageUrls)) {
+       updateData.imageUrls = imageUrls
+     }
+diff --git a/Backend/prisma/migrations/20260728120000_add_drivers_and_vehicle_details/migration.sql b/Backend/prisma/migrations/20260728120000_add_drivers_and_vehicle_details/migration.sql
+new file mode 100644
+index 0000000..02ae7d7
+--- /dev/null
++++ b/Backend/prisma/migrations/20260728120000_add_drivers_and_vehicle_details/migration.sql
+@@ -0,0 +1,27 @@
++-- CreateEnum
++CREATE TYPE "DriverStatus" AS ENUM ('ACTIVE', 'INACTIVE');
++
++-- AlterTable
++-- variant/year/registrationPlate are nullable: existing vehicles were
++-- created before these fields existed and won't have values until an
++-- admin edits them.
++ALTER TABLE "VehiclePackage" ADD COLUMN     "variant" TEXT,
++ADD COLUMN     "year" INTEGER,
++ADD COLUMN     "registrationPlate" TEXT;
++
++-- CreateTable
++CREATE TABLE "Driver" (
++    "id" SERIAL NOT NULL,
++    "fullName" TEXT NOT NULL,
++    "phone" TEXT NOT NULL,
++    "status" "DriverStatus" NOT NULL DEFAULT 'ACTIVE',
++    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
++
++    CONSTRAINT "Driver_pkey" PRIMARY KEY ("id")
++);
++
++-- AlterTable
++ALTER TABLE "Booking" ADD COLUMN     "driverId" INTEGER;
++
++-- AddForeignKey
++ALTER TABLE "Booking" ADD CONSTRAINT "Booking_driverId_fkey" FOREIGN KEY ("driverId") REFERENCES "Driver"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+diff --git a/Backend/prisma/schema.prisma b/Backend/prisma/schema.prisma
+index 1f9963c..fb0a19a 100644
+--- a/Backend/prisma/schema.prisma
++++ b/Backend/prisma/schema.prisma
+@@ -36,6 +36,11 @@ enum RentalMode {
+   SELF_DRIVE
+ }
+ 
++enum DriverStatus {
++  ACTIVE
++  INACTIVE
++}
++
+ model User {
+   id           Int      @id @default(autoincrement())
+   fullName     String
+@@ -54,6 +59,10 @@ model VehiclePackage {
+   category      String
+   make          String
+   model         String
++  // Nullable for backward compat with vehicles created before these fields existed
++  variant           String?
++  year              Int?
++  registrationPlate String?
+   seatingCapacity Int
+   transmission  Transmission
+   hasAC         Boolean
+@@ -81,6 +90,16 @@ model Outlet {
+   bookings    Booking[]
+ }
+ 
++model Driver {
++  id        Int          @id @default(autoincrement())
++  fullName  String
++  phone     String
++  status    DriverStatus @default(ACTIVE)
++  createdAt DateTime     @default(now())
++
++  bookings  Booking[]
++}
++
+ model Booking {
+   id               Int           @id @default(autoincrement())
+   bookingReference String        @unique
+@@ -106,6 +125,10 @@ model Booking {
+   outletId         Int?
+   outlet           Outlet?       @relation(fields: [outletId], references: [id])
+ 
++  // With-Driver: assigned driver (nullable — assigned by an admin after booking, not at creation)
++  driverId         Int?
++  driver           Driver?       @relation(fields: [driverId], references: [id])
++
+   customerId       Int
+   customer         User          @relation(fields: [customerId], references: [id])
+ 
+diff --git a/Backend/routes/bookings.js b/Backend/routes/bookings.js
+index 1a3aa3d..7a4d679 100644
+--- a/Backend/routes/bookings.js
++++ b/Backend/routes/bookings.js
+@@ -1,6 +1,6 @@
+ const express = require('express')
+ const { authenticate, authorize } = require('../middleware/auth')
+-const { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking } = require('../controllers/bookingController')
++const { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking, assignDriver } = require('../controllers/bookingController')
+ 
+ const router = express.Router()
+ 
+@@ -9,6 +9,8 @@ router.get('/', authenticate, getBookings)
+ router.put('/:id/status', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), updateBookingStatus)
+ // Allow customers to cancel their own bookings
+ router.put('/:id/cancel', authenticate, authorize('CUSTOMER'), cancelBooking)
++// Assign (or reassign) a driver to a With-Driver booking, with overlap checking
++router.put('/:id/assign-driver', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), assignDriver)
+ // Allow admins to permanently remove cancelled booking logs
+ router.delete('/:id', authenticate, authorize('ADMIN'), deleteBooking)
+ 
+diff --git a/Backend/routes/drivers.js b/Backend/routes/drivers.js
+new file mode 100644
+index 0000000..4d067c5
+--- /dev/null
++++ b/Backend/routes/drivers.js
+@@ -0,0 +1,19 @@
++const express = require('express')
++const { authenticate, authorize } = require('../middleware/auth')
++const {
++  getDrivers,
++  getDriverById,
++  createDriver,
++  updateDriver,
++  deleteDriver,
++} = require('../controllers/driverController')
++
++const router = express.Router()
++
++router.get('/', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), getDrivers)
++router.get('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), getDriverById)
++router.post('/', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), createDriver)
++router.put('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), updateDriver)
++router.delete('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN'), deleteDriver)
++
++module.exports = router
+diff --git a/Backend/server.js b/Backend/server.js
+index 9c363a9..eea4ea6 100644
+--- a/Backend/server.js
++++ b/Backend/server.js
+@@ -7,6 +7,7 @@ const vehicleRoutes = require("./routes/vehicles")
+ const bookingRoutes = require("./routes/bookings")
+ const dashboardRoutes = require("./routes/dashboard.js")
+ const outletRoutes = require("./routes/outlets")
++const driverRoutes = require("./routes/drivers")
+ const userRoutes = require("./routes/users")
+ const publicRoutes = require('./routes/public')
+ const cors = require("cors")
+@@ -22,6 +23,7 @@ app.use("/vehicles", vehicleRoutes)
+ app.use("/bookings", bookingRoutes)
+ app.use("/dashboard", dashboardRoutes)
+ app.use("/outlets", outletRoutes)
++app.use("/drivers", driverRoutes)
+ app.use("/users", userRoutes)
+ app.use('/public', publicRoutes)
+ // destinations feature removed; cities are derived from outlets
+diff --git a/Backend/utils/driverAvailability.js b/Backend/utils/driverAvailability.js
+new file mode 100644
+index 0000000..6f04303
+--- /dev/null
++++ b/Backend/utils/driverAvailability.js
+@@ -0,0 +1,39 @@
++// Shared driver-availability logic — used by both the drivers list endpoint
++// (GET /drivers?available=true&...) and driver assignment on bookings, so
++// "available" means the same thing in both places: not already assigned to
++// another active (PENDING/CONFIRMED) booking whose time range overlaps the
++// requested pickup/return window.
++//
++// Two ranges [aStart, aEnd) and [bStart, bEnd) overlap iff
++// aStart < bEnd && bStart < aEnd — expressed below as a Prisma where clause
++// rather than pulled into JS, so the DB does the filtering.
++
++const ACTIVE_BOOKING_STATUSES = ['PENDING', 'CONFIRMED']
++
++async function getBusyDriverIds(prisma, pickupDateTime, returnDateTime, excludeBookingId) {
++  const pickup = new Date(pickupDateTime)
++  const returnTime = new Date(returnDateTime)
++
++  const overlapping = await prisma.booking.findMany({
++    where: {
++      driverId: { not: null },
++      status: { in: ACTIVE_BOOKING_STATUSES },
++      ...(excludeBookingId ? { id: { not: Number(excludeBookingId) } } : {}),
++      pickupDateTime: { lt: returnTime },
++      returnDateTime: { gt: pickup },
++    },
++    select: { driverId: true },
++  })
++
++  return new Set(overlapping.map((booking) => booking.driverId))
++}
++
++async function isDriverAvailable(prisma, driverId, pickupDateTime, returnDateTime, excludeBookingId) {
++  const driver = await prisma.driver.findUnique({ where: { id: Number(driverId) } })
++  if (!driver || driver.status !== 'ACTIVE') return false
++
++  const busyDriverIds = await getBusyDriverIds(prisma, pickupDateTime, returnDateTime, excludeBookingId)
++  return !busyDriverIds.has(driver.id)
++}
++
++module.exports = { getBusyDriverIds, isDriverAvailable }
+-- 
+2.43.0
+

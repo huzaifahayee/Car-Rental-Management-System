@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const { geocodeAddress, validateCoordinates } = require('../utils/geocoding')
+const { isDriverAvailable } = require('../utils/driverAvailability')
 
 function generateBookingReference() {
   return `GT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
@@ -197,6 +198,7 @@ async function getBookings(req, res) {
         vehiclePackage: true,
         customer: { select: { fullName: true, email: true, phone: true, cnic: true } },
         outlet: true,
+        driver: true,
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -227,6 +229,7 @@ async function updateBookingStatus(req, res) {
           customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
           vehiclePackage: true,
           outlet: true,
+          driver: true,
         },
       }),
       req.prisma.vehiclePackage.update({
@@ -266,6 +269,7 @@ async function cancelBooking(req, res) {
           customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
           vehiclePackage: true,
           outlet: true,
+          driver: true,
         },
       }),
       req.prisma.vehiclePackage.update({
@@ -277,6 +281,54 @@ async function cancelBooking(req, res) {
     res.json(updated)
   } catch (err) {
     res.status(500).json({ error: 'Failed to cancel booking', details: err.message })
+  }
+}
+
+async function assignDriver(req, res) {
+  const { driverId } = req.body
+  const id = Number(req.params.id)
+
+  if (!driverId) {
+    return res.status(400).json({ error: 'driverId is required.' })
+  }
+
+  try {
+    const booking = await req.prisma.booking.findUnique({ where: { id } })
+    if (!booking) return res.status(404).json({ error: 'Booking not found.' })
+
+    if (booking.rentalMode !== 'WITH_DRIVER') {
+      return res.status(400).json({ error: 'A driver can only be assigned to With-Driver bookings.' })
+    }
+    if (['CANCELLED', 'COMPLETED'].includes(booking.status)) {
+      return res.status(400).json({ error: `Cannot assign a driver to a booking with status ${booking.status}.` })
+    }
+
+    const driver = await req.prisma.driver.findUnique({ where: { id: Number(driverId) } })
+    if (!driver) return res.status(404).json({ error: 'Driver not found.' })
+    if (driver.status !== 'ACTIVE') {
+      return res.status(409).json({ error: 'This driver is not active.' })
+    }
+
+    // Real overlap check — excludes this booking itself so re-confirming the
+    // same driver on the same booking doesn't false-positive against itself.
+    const available = await isDriverAvailable(req.prisma, driver.id, booking.pickupDateTime, booking.returnDateTime, booking.id)
+    if (!available) {
+      return res.status(409).json({ error: 'This driver is already assigned to an overlapping booking.' })
+    }
+
+    const updated = await req.prisma.booking.update({
+      where: { id },
+      data: { driverId: driver.id },
+      include: {
+        customer: { select: { id: true, fullName: true, email: true, phone: true, cnic: true } },
+        vehiclePackage: true,
+        outlet: true,
+        driver: true,
+      },
+    })
+    res.json(updated)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to assign driver', details: err.message })
   }
 }
 
@@ -298,4 +350,4 @@ async function deleteBooking(req, res) {
   }
 }
 
-module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking }
+module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking, assignDriver }

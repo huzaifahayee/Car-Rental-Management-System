@@ -36,6 +36,11 @@ enum RentalMode {
   SELF_DRIVE
 }
 
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   fullName     String
@@ -54,6 +59,10 @@ model VehiclePackage {
   category      String
   make          String
   model         String
+  // Nullable for backward compat with vehicles created before these fields existed
+  variant           String?
+  year              Int?
+  registrationPlate String?
   seatingCapacity Int
   transmission  Transmission
   hasAC         Boolean
@@ -62,6 +71,7 @@ model VehiclePackage {
   pickupCity    String
   dropoffCity   String
   status        VehicleStatus @default(AVAILABLE)
+  isArchived    Boolean      @default(false)
   createdAt     DateTime     @default(now())
   imageUrls String[] @default([])
 
@@ -79,6 +89,16 @@ model Outlet {
   createdAt   DateTime @default(now())
 
   bookings    Booking[]
+}
+
+model Driver {
+  id        Int          @id @default(autoincrement())
+  fullName  String
+  phone     String
+  status    DriverStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+
+  bookings  Booking[]
 }
 
 model Booking {
@@ -105,6 +125,10 @@ model Booking {
   // Self-Drive: outlet reference
   outletId         Int?
   outlet           Outlet?       @relation(fields: [outletId], references: [id])
+
+  // With-Driver: assigned driver (nullable — assigned by an admin after booking, not at creation)
+  driverId         Int?
+  driver           Driver?       @relation(fields: [driverId], references: [id])
 
   customerId       Int
   customer         User          @relation(fields: [customerId], references: [id])
