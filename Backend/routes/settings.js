@@ -1,11 +1,13 @@
 const express = require('express')
 const { authenticate, authorize } = require('../middleware/auth')
-const { getSettings, updateSettings, getTheme, updateTheme } = require('../controllers/settingsController')
+const { uploadLogo: uploadLogoMiddleware } = require('../middleware/upload')
+const { getSettings, updateSettings, getTheme, updateTheme, uploadLogo } = require('../controllers/settingsController')
 
 const router = express.Router()
 
 router.get('/', getSettings)
 router.put('/', authenticate, authorize('ADMIN'), updateSettings)
+router.post('/logo', authenticate, authorize('SUPERADMIN', 'ADMIN'), uploadLogoMiddleware.single('logo'), uploadLogo)
 
 // Theme endpoints
 router.get('/theme', getTheme)

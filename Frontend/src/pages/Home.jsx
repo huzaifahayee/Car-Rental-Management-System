@@ -268,7 +268,7 @@ export default function Home() {
         <div className="hero-ambient hero-ambient-two" aria-hidden="true" />
         <div className="hero-road-lines" aria-hidden="true" />
 
-        <div className="hero-content relative max-w-4xl mx-auto px-6 pt-16 pb-20 text-center">
+        <div className="hero-content relative max-w-6xl mx-auto px-4 md:px-8 pt-16 pb-20 text-center">
           <p className="hero-enter hero-enter-1" style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 12, letterSpacing: 3, textTransform: 'uppercase', marginBottom: 12 }}>
             Car Rental Booking
           </p>
@@ -281,7 +281,7 @@ export default function Home() {
             <span>Trusted by travellers across Pakistan</span>
           </div>
 
-          <div className="hero-search-card hero-enter hero-enter-4" style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: '28px 32px', textAlign: 'left' }}>
+          <div className="hero-search-card hero-enter hero-enter-4" style={{ background: '#fff', borderRadius: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.3)', padding: '28px 36px', textAlign: 'left', width: '100%' }}>
             
             {/* Toggles Row */}
             <div className="flex flex-wrap gap-6 mb-6 pb-4" style={{ borderBottom: '1px solid #f0f0f0' }}>
@@ -548,7 +548,7 @@ export default function Home() {
       </section>
 
       {/* How-to steps */}
-      <section id="how-it-works" className="scroll-reveal" style={{ background: 'linear-gradient(135deg, #f0fdf7 0%, #e8f8f0 100%)' }}>
+      <section id="how-it-works" className="scroll-reveal" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eef2f7 100%)' }}>
         <div className="max-w-5xl mx-auto px-6 py-16">
           <div className="text-center mb-12">
             <ScrollWords as="h2" text="How to Book a Car" style={{ fontWeight: 800, fontSize: 26, color: '#1a1a2e', marginBottom: 8 }} />

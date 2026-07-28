@@ -10,6 +10,16 @@ const storage = new CloudinaryStorage({
   },
 })
 
+const logoStorage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'garitrip/branding',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
+  },
+})
+
 const upload = multer({ storage })
+const uploadLogo = multer({ storage: logoStorage })
 
 module.exports = upload
+module.exports.uploadLogo = uploadLogo

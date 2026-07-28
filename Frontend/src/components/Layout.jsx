@@ -28,6 +28,8 @@ export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
+  const [agencyName, setAgencyName] = useState(PLACEHOLDER_AGENCY_NAME)
+  const [agencyLogoUrl, setAgencyLogoUrl] = useState(null)
 
   const closeMobileMenu = () => setMobileOpen(false)
   const closeUserMenu = () => setUserMenuOpen(false)
@@ -72,13 +74,15 @@ export default function Layout() {
     closeMobileMenu()
   }, [location.pathname])
 
-  // Fetch tenant settings (theme) once and apply
+  // Fetch tenant settings (theme, agency name, logo) once and apply
   useEffect(() => {
     let mounted = true
-    apiFetch('/settings/theme')
+    apiFetch('/settings')
       .then(data => {
-        if (!mounted) return
-        if (data && data.themePalette) applyThemeFromName(data.themePalette)
+        if (!mounted || !data) return
+        if (data.themePalette) applyThemeFromName(data.themePalette)
+        if (data.agencyName) setAgencyName(data.agencyName)
+        if (data.logoUrl) setAgencyLogoUrl(data.logoUrl)
       })
       .catch(() => {})
     return () => { mounted = false }
@@ -133,11 +137,15 @@ export default function Layout() {
       <header style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="w-full px-6 md:px-10 flex items-center justify-between py-4">
           <Link to="/" onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 18 }}>G</span>
+            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {agencyLogoUrl ? (
+                <img src={agencyLogoUrl} alt={agencyName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 18 }}>{agencyName.charAt(0).toUpperCase()}</span>
+              )}
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e', lineHeight: 1.1 }}>{PLACEHOLDER_AGENCY_NAME}</div>
+              <div style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e', lineHeight: 1.1 }}>{agencyName}</div>
               <div style={{ fontSize: 11, color: '#888', fontWeight: 500 }}>Car Rental & Hotel Booking</div>
             </div>
           </Link>
@@ -263,13 +271,13 @@ export default function Layout() {
         </div>
       )}
 
-      {!isAuthPage && <Footer />}
+      {!isAuthPage && <Footer agencyName={agencyName} agencyLogoUrl={agencyLogoUrl} />}
 
     </div>
   )
 }
 
-function Footer() {
+function Footer({ agencyName = PLACEHOLDER_AGENCY_NAME, agencyLogoUrl = null }) {
   const AGENCY_TAGLINE = 'Multi-tenant car rental & hotel booking platform'
   const FOOTER_LINKS = {
     Company: ['About Us', 'Contact', 'Blogs', 'Careers'],
@@ -282,10 +290,14 @@ function Footer() {
       <div className="max-w-6xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-4 gap-10">
         <div>
             <div className="flex items-center gap-2 mb-4">
-            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 15 }}>G</span>
+            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {agencyLogoUrl ? (
+                <img src={agencyLogoUrl} alt={agencyName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 15 }}>{agencyName.charAt(0).toUpperCase()}</span>
+              )}
             </div>
-            <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{PLACEHOLDER_AGENCY_NAME}</span>
+            <span style={{ color: '#fff', fontWeight: 800, fontSize: 15 }}>{agencyName}</span>
           </div>
           <p style={{ fontSize: 13, lineHeight: 1.75 }}>{AGENCY_TAGLINE}</p>
         </div>
@@ -310,7 +322,7 @@ function Footer() {
         ))}
       </div>
       <div style={{ borderTop: '1px solid #1f2937', padding: '16px 24px', textAlign: 'center', fontSize: 13, color: '#6b7280' }}>
-        © 2026 {PLACEHOLDER_AGENCY_NAME}. All rights reserved.
+        © 2026 {agencyName}. All rights reserved.
       </div>
     </footer>
   )

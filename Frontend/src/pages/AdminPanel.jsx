@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import ThemeEditor from '../components/ThemeEditor'
+import AgencySettingsEditor from '../components/AgencySettingsEditor'
 import { formatCnic, formatPhone } from '../lib/validation'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
@@ -667,7 +668,7 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
           <aside style={{ width: 260, flexShrink: 0 }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '14px 12px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-              {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'themes'].map(item => (
+             {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'settings', 'themes'].map(item => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
@@ -680,7 +681,7 @@ export default function AdminPanel() {
                     transition: 'background 0.15s ease, color 0.15s ease',
                   }}
                 >
-                  {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item[0].toUpperCase() + item.slice(1)}
+            {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item === 'settings' ? 'Agency Settings' : item[0].toUpperCase() + item.slice(1)}
                 </button>
               ))}
             </div>
@@ -690,7 +691,7 @@ export default function AdminPanel() {
             {/* Prominent heading for currently selected sidebar item moved to TOP */}
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>
-                {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab[0].toUpperCase() + tab.slice(1)}
+             {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab === 'settings' ? 'Agency Settings' : tab[0].toUpperCase() + tab.slice(1)}
               </h2>
             </div>
 
@@ -705,15 +706,17 @@ export default function AdminPanel() {
               </div>
             )}
 
-            {tab === 'themes' && (
-              <DataCard title="Themes">
-                {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
-                  <ThemeEditor />
-                ) : (
-                  <p style={{ color: '#64748b', margin: 0 }}>Theme settings are only available for admin roles.</p>
-                )}
-              </DataCard>
-            )}
+          {tab === 'settings' && (
+  <DataCard title="Agency Settings">
+    {['SUPERADMIN', 'ADMIN'].includes(user.role) ? (
+      <AgencySettingsEditor />
+    ) : (
+      <p style={{ color: '#64748b', margin: 0 }}>Agency settings are only available for admin roles.</p>
+    )}
+  </DataCard>
+)}
+
+{tab === 'themes' && (
 
             {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
             

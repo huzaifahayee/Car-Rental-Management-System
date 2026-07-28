@@ -118,5 +118,6 @@ model Settings {
   agencyName   String
   contactEmail String
   contactPhone String?
+  logoUrl      String?
   themePalette String @default("default")
 }

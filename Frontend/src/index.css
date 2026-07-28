@@ -234,8 +234,7 @@
   opacity: 1;
   transform: translateY(0);
 }
-
-.trust-section { background: #f5fdf9; border-bottom: 1px solid #dff5ea; }
+.trust-section { background: #f1f5f9; border-bottom: 1px solid #e2e8f0; }
 .trust-card {
   display: flex;
   align-items: center;

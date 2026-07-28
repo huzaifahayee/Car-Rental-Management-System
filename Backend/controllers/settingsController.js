@@ -25,7 +25,25 @@ async function updateSettings(req, res) {
   }
 }
 
-module.exports = { getSettings, updateSettings }
+async function uploadLogo(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No logo file uploaded.' })
+  }
+  try {
+    const logoUrl = req.file.path
+    const existing = await req.prisma.settings.findFirst()
+    const settings = existing
+      ? await req.prisma.settings.update({ where: { id: existing.id }, data: { logoUrl } })
+      : await req.prisma.settings.create({
+        data: { agencyName: 'Unnamed Agency', contactEmail: 'admin@example.com', logoUrl },
+      })
+    res.json(settings)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to upload logo', details: err.message })
+  }
+}
+
+module.exports = { getSettings, updateSettings, uploadLogo }
 
 async function getTheme(req, res) {
   try {
