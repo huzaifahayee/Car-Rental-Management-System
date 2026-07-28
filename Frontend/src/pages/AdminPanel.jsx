@@ -114,6 +114,7 @@ export default function AdminPanel() {
   const [bookings, setBookings] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [outlets, setOutlets] = useState([])
+  const [drivers, setDrivers] = useState([])
   const [usersList, setUsersList] = useState([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
@@ -144,13 +145,20 @@ export default function AdminPanel() {
   const [showVehicleModal, setShowVehicleModal] = useState(false)
   const [editingVehicle, setEditingVehicle] = useState(null)
   const [vehicleForm, setVehicleForm] = useState({
-    category: 'Sedan', make: '', model: '', seatingCapacity: 5, transmission: 'AUTOMATIC',
+    category: 'Sedan', make: '', model: '', variant: '', year: '', registrationPlate: '', seatingCapacity: 5, transmission: 'AUTOMATIC',
     hasAC: true, driverOption: true, pricePerDay: 5000, pickupCity: 'Lahore', dropoffCity: 'Lahore',
     imageUrl: '', status: 'AVAILABLE',
   })
   const [vehicleFormError, setVehicleFormError] = useState('')
   const [vehicleSubmitting, setVehicleSubmitting] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
+
+  // Modal State for Drivers
+  const [showDriverModal, setShowDriverModal] = useState(false)
+  const [editingDriver, setEditingDriver] = useState(null)
+  const [driverForm, setDriverForm] = useState({ fullName: '', phone: '', status: 'ACTIVE' })
+  const [driverFormError, setDriverFormError] = useState('')
+  const [driverSubmitting, setDriverSubmitting] = useState(false)
 
   // Reusable confirmation and error modal states
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', confirmBg: 'var(--brand)' })
@@ -181,14 +189,16 @@ export default function AdminPanel() {
       apiFetch('/bookings'),
       apiFetch('/vehicles'),
       apiFetch('/outlets?isActive=all'),
+      apiFetch('/drivers'),
       apiFetch('/users'),
     ])
-      .then(([dashboard, liveBookings, liveVehicles, liveOutlets, liveUsers]) => {
+      .then(([dashboard, liveBookings, liveVehicles, liveOutlets, liveDrivers, liveUsers]) => {
         setError('')
         setStats(dashboard)
         setBookings(liveBookings)
         setVehicles(liveVehicles)
         setOutlets(liveOutlets)
+        setDrivers(liveDrivers)
         setUsersList(liveUsers)
       })
       .catch(err => setError(err.message))
@@ -518,7 +528,7 @@ export default function AdminPanel() {
   function openCreateVehicleModal() {
     setEditingVehicle(null)
     setVehicleForm({
-      category: 'Sedan', make: '', model: '', seatingCapacity: 5, transmission: 'AUTOMATIC',
+      category: 'Sedan', make: '', model: '', variant: '', year: '', registrationPlate: '', seatingCapacity: 5, transmission: 'AUTOMATIC',
       hasAC: true, driverOption: true, pricePerDay: 5000, pickupCity: 'Lahore', dropoffCity: 'Lahore',
       imageUrl: '', status: 'AVAILABLE',
     })
@@ -533,6 +543,9 @@ export default function AdminPanel() {
       category: vehicle.category,
       make: vehicle.make,
       model: vehicle.model,
+      variant: vehicle.variant || '',
+      year: vehicle.year != null ? String(vehicle.year) : '',
+      registrationPlate: vehicle.registrationPlate || '',
       seatingCapacity: vehicle.seatingCapacity,
       transmission: vehicle.transmission,
       hasAC: vehicle.hasAC,
@@ -552,7 +565,7 @@ export default function AdminPanel() {
     e.preventDefault()
     setVehicleFormError('')
 
-    const { category, make, model, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrl, status } = vehicleForm
+    const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, imageUrl, status } = vehicleForm
     if (!category.trim() || !make.trim() || !model.trim() || !pickupCity.trim() || !dropoffCity.trim()) {
       setVehicleFormError('All fields (make, model, pickup city, dropoff city) are required.')
       return
@@ -568,6 +581,11 @@ export default function AdminPanel() {
       setVehicleFormError('Seating capacity must be a valid positive number.')
       return
     }
+    const yearNum = year.trim() ? Number(year) : null
+    if (year.trim() && (isNaN(yearNum) || yearNum < 1980 || yearNum > new Date().getFullYear() + 1)) {
+      setVehicleFormError('Year must be a valid 4-digit year.')
+      return
+    }
 
     const imageUrlsPayload = imageUrl.trim() ? [imageUrl.trim()] : []
 
@@ -581,6 +599,9 @@ export default function AdminPanel() {
             category: category.trim(),
             make: make.trim(),
             model: model.trim(),
+            variant: variant.trim() || null,
+            year: yearNum,
+            registrationPlate: registrationPlate.trim() || null,
             seatingCapacity: seatsNum,
             transmission,
             hasAC,
@@ -599,6 +620,9 @@ export default function AdminPanel() {
             category: category.trim(),
             make: make.trim(),
             model: model.trim(),
+            variant: variant.trim() || null,
+            year: yearNum,
+            registrationPlate: registrationPlate.trim() || null,
             seatingCapacity: seatsNum,
             transmission,
             hasAC,
@@ -642,6 +666,66 @@ export default function AdminPanel() {
     )
   }
 
+  // Driver Modal actions
+  function openCreateDriverModal() {
+    setEditingDriver(null)
+    setDriverForm({ fullName: '', phone: '', status: 'ACTIVE' })
+    setDriverFormError('')
+    setShowDriverModal(true)
+  }
+
+  function openEditDriverModal(driver) {
+    setEditingDriver(driver)
+    setDriverForm({ fullName: driver.fullName, phone: driver.phone, status: driver.status })
+    setDriverFormError('')
+    setShowDriverModal(true)
+  }
+
+  async function handleSaveDriver(e) {
+    e.preventDefault()
+    setDriverFormError('')
+
+    const { fullName, phone, status } = driverForm
+    if (!fullName.trim() || !phone.trim()) {
+      setDriverFormError('Full name and phone number are required.')
+      return
+    }
+
+    setDriverSubmitting(true)
+    try {
+      if (editingDriver) {
+        await apiFetch(`/drivers/${editingDriver.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim(), status }),
+        })
+      } else {
+        await apiFetch('/drivers', {
+          method: 'POST',
+          body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim() }),
+        })
+      }
+      setShowDriverModal(false)
+      reloadData()
+    } catch (err) { setDriverFormError(err.message) } finally { setDriverSubmitting(false) }
+  }
+
+  function handleDeleteDriver(driverId, driverName) {
+    showConfirm(
+      'Delete Driver',
+      `Are you sure you want to delete "${driverName}"? Drivers with active booking assignments can't be deleted — set them to inactive instead.`,
+      async () => {
+        try {
+          await apiFetch(`/drivers/${driverId}`, { method: 'DELETE' })
+          reloadData()
+        } catch (err) {
+          showError(err.message, 'Failed to Delete')
+        }
+      },
+      'Delete',
+      '#dc2626'
+    )
+  }
+
   if (authLoading) return <PanelState title="Loading dashboard…" />
   if (!user || !STAFF_ROLES.includes(user.role)) return <Navigate to="/" replace />
   if (loading) return <PanelState title="Loading dashboard…" />
@@ -671,7 +755,7 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
           <aside style={{ width: 260, flexShrink: 0 }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '14px 12px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-             {['overview', 'bookings', 'vehicles', 'outlets', 'users', 'settings', 'themes'].map(item => (
+             {['overview', 'bookings', 'vehicles', 'drivers', 'outlets', 'users', 'settings', 'themes'].map(item => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
@@ -758,6 +842,29 @@ export default function AdminPanel() {
               </DataCard>
             )}
             
+            {/* Drivers Management Tab */}
+            {tab === 'drivers' && (
+              <DataCard
+                title={`Drivers (${drivers.length})`}
+                action={
+                  ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(user.role) && (
+                    <button
+                      onClick={openCreateDriverModal}
+                      style={{
+                        background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                        borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      + Add Driver
+                    </button>
+                  )
+                }
+              >
+                <DriversTable drivers={drivers} currentUser={user} onEdit={openEditDriverModal} onDelete={handleDeleteDriver} />
+              </DataCard>
+            )}
+
             {/* Outlets Management Tab */}
             {tab === 'outlets' && (
               <DataCard
@@ -1177,6 +1284,21 @@ export default function AdminPanel() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label style={modalLabel}>Variant</label>
+                  <input type="text" value={vehicleForm.variant} onChange={e => setVehicleForm({ ...vehicleForm, variant: e.target.value })} placeholder="e.g. GLi" style={modalInput} />
+                </div>
+                <div>
+                  <label style={modalLabel}>Year</label>
+                  <input type="number" min="1980" max={new Date().getFullYear() + 1} value={vehicleForm.year} onChange={e => setVehicleForm({ ...vehicleForm, year: e.target.value })} placeholder="e.g. 2023" style={modalInput} />
+                </div>
+                <div>
+                  <label style={modalLabel}>Registration Plate</label>
+                  <input type="text" value={vehicleForm.registrationPlate} onChange={e => setVehicleForm({ ...vehicleForm, registrationPlate: e.target.value })} placeholder="e.g. LEA-1234" style={modalInput} />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label style={modalLabel}>Category</label>
@@ -1370,6 +1492,53 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Driver Create / Edit Modal */}
+      {showDriverModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e' }}>
+                {editingDriver ? 'Edit Driver' : 'Add New Driver'}
+              </h2>
+              <button onClick={() => setShowDriverModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+
+            <form onSubmit={handleSaveDriver} style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={modalLabel}>Full Name</label>
+                <input type="text" value={driverForm.fullName} onChange={e => setDriverForm({ ...driverForm, fullName: e.target.value })} placeholder="e.g. Ahmed Khan" required style={modalInput} />
+              </div>
+
+              <div>
+                <label style={modalLabel}>Phone Number</label>
+                <input type="tel" value={driverForm.phone} onChange={e => setDriverForm({ ...driverForm, phone: e.target.value })} placeholder="03001234567" required style={modalInput} />
+              </div>
+
+              {editingDriver && (
+                <div>
+                  <label style={modalLabel}>Status</label>
+                  <IOSDropdown
+                    value={driverForm.status}
+                    onChange={e => setDriverForm({ ...driverForm, status: e.target.value })}
+                    label="Status"
+                    options={['ACTIVE', 'INACTIVE']}
+                  />
+                </div>
+              )}
+
+              {driverFormError && <p style={{ color: '#c53030', fontSize: 13, margin: 0 }}>{driverFormError}</p>}
+
+              <div className="flex justify-end gap-3 mt-3">
+                <button type="button" onClick={() => setShowDriverModal(false)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={driverSubmitting} style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: driverSubmitting ? 0.7 : 1 }}>
+                  {driverSubmitting ? 'Saving...' : 'Save Driver'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Reusable Confirmation Modal */}
       {confirmModal.show && (
         <div style={{ ...modalOverlayStyle, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
@@ -1437,7 +1606,15 @@ export default function AdminPanel() {
 
       {/* Booking Details Modal — full customer + ride info, useful to review before approving */}
       {viewBookingModal && (
-        <BookingDetailsModal booking={viewBookingModal} onClose={() => setViewBookingModal(null)} />
+        <BookingDetailsModal
+          booking={viewBookingModal}
+          currentUser={user}
+          onClose={() => setViewBookingModal(null)}
+          onAssigned={(updatedBooking) => {
+            setViewBookingModal(updatedBooking)
+            reloadData()
+          }}
+        />
       )}
     </div>
   )
@@ -1656,7 +1833,7 @@ function DetailSection({ title, children }) {
   )
 }
 
-function BookingDetailsModal({ booking, onClose }) {
+function BookingDetailsModal({ booking, currentUser, onClose, onAssigned }) {
   const vehicle = booking.vehiclePackage
   const customer = booking.customer
   const scrollRef = useRef(null)
@@ -1664,6 +1841,47 @@ function BookingDetailsModal({ booking, onClose }) {
   const [showScrollFade, setShowScrollFade] = useState(false)
   const [footerHeight, setFooterHeight] = useState(60)
   const [statusBg, statusColor] = STATUS_COLORS[booking.status] || ['#f3f4f6', '#555']
+
+  const canManageDriver = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(currentUser?.role)
+  const canAssignDriver = booking.rentalMode === 'WITH_DRIVER' && canManageDriver && !['CANCELLED', 'COMPLETED'].includes(booking.status)
+  const [currentDriver, setCurrentDriver] = useState(booking.driver || null)
+  const [availableDrivers, setAvailableDrivers] = useState([])
+  const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [assigning, setAssigning] = useState(false)
+  const [assignError, setAssignError] = useState('')
+
+  useEffect(() => {
+    setCurrentDriver(booking.driver || null)
+    if (!canAssignDriver) return
+    const params = new URLSearchParams({
+      available: 'true',
+      pickupDateTime: booking.pickupDateTime,
+      returnDateTime: booking.returnDateTime,
+      excludeBookingId: String(booking.id),
+    })
+    apiFetch(`/drivers?${params.toString()}`)
+      .then(setAvailableDrivers)
+      .catch(() => setAvailableDrivers([]))
+  }, [booking.id])
+
+  async function handleAssignDriver() {
+    if (!selectedDriverId) return
+    setAssigning(true)
+    setAssignError('')
+    try {
+      const updated = await apiFetch(`/bookings/${booking.id}/assign-driver`, {
+        method: 'PUT',
+        body: JSON.stringify({ driverId: Number(selectedDriverId) }),
+      })
+      setCurrentDriver(updated.driver)
+      setSelectedDriverId('')
+      onAssigned?.(updated)
+    } catch (err) {
+      setAssignError(err.message)
+    } finally {
+      setAssigning(false)
+    }
+  }
 
   const checkScroll = () => {
     const el = scrollRef.current
@@ -1742,8 +1960,48 @@ function BookingDetailsModal({ booking, onClose }) {
               )}
             </DetailSection>
 
+            {booking.rentalMode === 'WITH_DRIVER' && (
+              <DetailSection title="Driver">
+                <DetailRow
+                  label="Assigned Driver"
+                  value={currentDriver ? `${currentDriver.fullName} (${formatPhone(currentDriver.phone)})` : 'Not assigned yet'}
+                />
+                {canAssignDriver && (
+                  <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                    <div style={{ flex: 1 }}>
+                      <IOSDropdown
+                        value={selectedDriverId}
+                        onChange={e => setSelectedDriverId(e.target.value)}
+                        label="Available Drivers"
+                        options={[
+                          { value: '', label: availableDrivers.length ? 'Select a driver…' : 'No drivers available for this slot' },
+                          ...availableDrivers.map(d => ({ value: String(d.id), label: `${d.fullName} — ${formatPhone(d.phone)}` })),
+                        ]}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAssignDriver}
+                      disabled={!selectedDriverId || assigning}
+                      style={{
+                        background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8,
+                        padding: '11px 16px', fontWeight: 700, fontSize: 12, cursor: 'pointer',
+                        opacity: (!selectedDriverId || assigning) ? 0.6 : 1, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {assigning ? 'Assigning…' : currentDriver ? 'Reassign' : 'Assign'}
+                    </button>
+                  </div>
+                )}
+                {assignError && <p style={{ color: '#c53030', fontSize: 12, margin: '8px 0 0' }}>{assignError}</p>}
+              </DetailSection>
+            )}
+
             <DetailSection title="Vehicle">
               <DetailRow label="Make & Model" value={`${vehicle?.make || ''} ${vehicle?.model || ''}`.trim()} />
+              <DetailRow label="Variant" value={vehicle?.variant} />
+              <DetailRow label="Year" value={vehicle?.year} />
+              <DetailRow label="Registration Plate" value={vehicle?.registrationPlate} />
               <DetailRow label="Category" value={vehicle?.category} />
               <DetailRow label="Seating Capacity" value={vehicle?.seatingCapacity} />
               <DetailRow label="Transmission" value={vehicle?.transmission ? label(vehicle.transmission) : null} />
@@ -1829,12 +2087,14 @@ function VehiclesTable({ vehicles, currentUser, onEdit, onDelete }) {
 
             <div style={{ padding: '14px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                <strong style={{ fontSize: 15, color: '#1a1a2e' }}>{vehicle.make} {vehicle.model}</strong>
+                <strong style={{ fontSize: 15, color: '#1a1a2e' }}>
+                  {vehicle.make} {vehicle.model}{vehicle.variant ? ` ${vehicle.variant}` : ''}{vehicle.year ? ` (${vehicle.year})` : ''}
+                </strong>
                 <strong style={{ color: 'var(--brand-2)', fontSize: 13, whiteSpace: 'nowrap' }}>Rs {vehicle.pricePerDay.toLocaleString()}/day</strong>
               </div>
 
               <p style={{ margin: '4px 0 0', color: '#98a2b3', fontSize: 12 }}>
-                {vehicle.pickupCity} → {vehicle.dropoffCity}
+                {vehicle.pickupCity} → {vehicle.dropoffCity}{vehicle.registrationPlate ? ` · ${vehicle.registrationPlate}` : ''}
               </p>
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '10px 0 12px' }}>
@@ -1912,6 +2172,44 @@ function OutletsTable({ outlets, onEdit, onDeactivate }) {
             </tr>
           )) : (
             <tr><td colSpan="6" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No branch outlets configured yet. Click "+ Add Outlet" to create one.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function DriversTable({ drivers, currentUser, onEdit, onDelete }) {
+  const canDelete = ['SUPERADMIN', 'ADMIN'].includes(currentUser?.role)
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            {['Name', 'Phone', 'Status', 'Registered', 'Actions'].map(heading => (
+              <th key={heading} style={th}>{heading}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {drivers.length ? drivers.map(driver => (
+            <tr key={driver.id} style={{ borderTop: '1px solid #f1f3f5' }}>
+              <td style={td}><strong>{driver.fullName}</strong></td>
+              <td style={td}>{formatPhone(driver.phone)}</td>
+              <td style={td}><Badge value={driver.status} /></td>
+              <td style={td}>{date(driver.createdAt)}</td>
+              <td style={td}>
+                <div className="flex gap-2">
+                  <button onClick={() => onEdit(driver)} style={{ background: '#f3f4f6', color: '#333', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                  {canDelete && (
+                    <button onClick={() => onDelete(driver.id, driver.fullName)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          )) : (
+            <tr><td colSpan="5" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No drivers added yet. Click "+ Add Driver" to create one.</td></tr>
           )}
         </tbody>
       </table>

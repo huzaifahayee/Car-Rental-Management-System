@@ -30,7 +30,7 @@ function validateDriverPayload({ fullName, phone }) {
 }
 
 async function getDrivers(req, res) {
-  const { status, available, pickupDateTime, returnDateTime } = req.query
+  const { status, available, pickupDateTime, returnDateTime, excludeBookingId } = req.query
 
   const where = {}
   if (status && VALID_STATUSES.includes(status)) where.status = status
@@ -42,7 +42,10 @@ async function getDrivers(req, res) {
       if (!pickupDateTime || !returnDateTime) {
         return res.status(400).json({ error: 'pickupDateTime and returnDateTime are required to filter by availability.' })
       }
-      const busyDriverIds = await getBusyDriverIds(req.prisma, pickupDateTime, returnDateTime)
+      // excludeBookingId lets a caller re-check availability for a booking that
+      // already has this driver assigned, so the driver's own booking doesn't
+      // make them look busy against themselves.
+      const busyDriverIds = await getBusyDriverIds(req.prisma, pickupDateTime, returnDateTime, excludeBookingId)
       drivers = drivers.filter((driver) => driver.status === 'ACTIVE' && !busyDriverIds.has(driver.id))
     }
 
