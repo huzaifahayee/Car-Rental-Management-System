@@ -80,6 +80,12 @@ export default function BookVehicle() {
     ? `Confirm booking for ${vehicle?.make} ${vehicle?.model} from ${new Date(pickupDateTime).toLocaleString()} to ${new Date(returnDateTime).toLocaleString()}.`
     : 'Please review your trip details before confirming.'
 
+  // Same day-count convention used in the Admin Panel (Math.ceil, min 1 day)
+  const rentalDays = (pickupDateTime && returnDateTime && new Date(returnDateTime) > new Date(pickupDateTime))
+    ? Math.max(1, Math.ceil((new Date(returnDateTime) - new Date(pickupDateTime)) / (1000 * 60 * 60 * 24)))
+    : null
+  const totalBill = rentalDays && vehicle ? rentalDays * vehicle.pricePerDay : null
+
   useEffect(() => {
     apiFetch(`/vehicles/${id}`)
       .then(setVehicle)
@@ -207,12 +213,25 @@ export default function BookVehicle() {
             <p style={{ color: '#667085', lineHeight: 1.6 }}>
               {vehicle.category} · {vehicle.seatingCapacity} seats · {vehicle.transmission.toLowerCase()} · {vehicle.hasAC ? 'Air conditioned' : 'No AC'}
             </p>
-            
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: 12, columnGap: 12, borderTop: '1px solid #e8edf0', paddingTop: 16, marginTop: 16 }}>
+              <DetailItem label="Make" value={vehicle.make} />
+              <DetailItem label="Model" value={vehicle.model} />
+              <DetailItem label="Variant" value={vehicle.variant} />
+              <DetailItem label="Registration Plate" value={vehicle.registrationPlate} />
+            </div>
+
             <div style={{ borderTop: '1px solid #e8edf0', paddingTop: 18, marginTop: 22 }}>
               <span style={{ color: '#667085', fontSize: 13 }}>From</span>
               <div style={{ color: 'var(--brand-2)', fontWeight: 800, fontSize: 28 }}>
                 Rs {vehicle.pricePerDay.toLocaleString()}<span style={{ color: '#667085', fontSize: 14 }}>/day</span>
               </div>
+              {totalBill != null && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px dashed #e8edf0', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                  <span style={{ color: '#667085', fontSize: 13 }}>Total for {rentalDays} day{rentalDays > 1 ? 's' : ''}</span>
+                  <span style={{ color: '#1a1a2e', fontWeight: 800, fontSize: 20 }}>Rs {totalBill.toLocaleString()}</span>
+                </div>
+              )}
             </div>
           </section>
 
@@ -433,6 +452,15 @@ function Confirmation({ booking, vehicle }) {
           Browse more vehicles
         </Link>
       </section>
+    </div>
+  )
+}
+
+function DetailItem({ label, value }) {
+  return (
+    <div>
+      <p style={{ margin: '0 0 3px', color: '#98a2b3', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.7 }}>{label}</p>
+      <p style={{ margin: 0, color: '#1a1a2e', fontSize: 14, fontWeight: 600 }}>{value || '—'}</p>
     </div>
   )
 }
