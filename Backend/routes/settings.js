@@ -6,7 +6,7 @@ const { getSettings, updateSettings, getTheme, updateTheme, uploadLogo } = requi
 const router = express.Router()
 
 router.get('/', getSettings)
-router.put('/', authenticate, authorize('ADMIN'), updateSettings)
+router.put('/', authenticate, authorize('SUPERADMIN', 'ADMIN'), updateSettings)
 router.post('/logo', authenticate, authorize('SUPERADMIN', 'ADMIN'), uploadLogoMiddleware.single('logo'), uploadLogo)
 
 // Theme endpoints

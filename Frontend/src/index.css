@@ -127,6 +127,47 @@
 .hero-enter-3 { animation-delay: 240ms; }
 .hero-enter-4 { animation-delay: 330ms; }
 
+/* Hero headline's rotating trailing phrase — left-to-right slide+fade,
+   inline with the static prefix on one line. ALL phrases stay permanently
+   stacked in the same CSS grid cell (grid-area: 1/1), including the ones
+   not currently shown (kept at opacity:0/visibility:hidden, not unmounted)
+   — so the container's auto-sized width/height is always based on the
+   fixed set of all phrases, never just whichever 1-2 happen to be mounted
+   mid-transition. That's what caused the static prefix to visibly shift:
+   the box was shrinking/growing per-rotation instead of staying constant. */
+.hero-rotator {
+  position: relative;
+  display: inline-grid;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+.hero-rotator-phrase {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  text-align: left;
+  opacity: 0;
+  visibility: hidden;
+}
+.hero-rotator-active {
+  visibility: visible;
+  animation: hero-rotate-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.hero-rotator-exiting {
+  visibility: visible;
+  animation: hero-rotate-out 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes hero-rotate-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+@keyframes hero-rotate-in {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-rotator-active, .hero-rotator-exiting { animation: none !important; opacity: 1; }
+}
+
 .hero-proof {
   display: inline-flex;
   align-items: center;

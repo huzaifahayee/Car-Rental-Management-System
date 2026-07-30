@@ -2298,7 +2298,7 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onApprove, onCan
                           Cancel
                         </button>
                       )}
-                      {booking.status === 'CANCELLED' && currentUser?.role === 'ADMIN' && (
+                      {booking.status === 'CANCELLED' && ['SUPERADMIN', 'ADMIN'].includes(currentUser?.role) && (
                         <button
                           onClick={() => onDeleteBooking && onDeleteBooking(booking)}
                           style={{

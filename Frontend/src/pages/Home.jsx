@@ -9,7 +9,16 @@ import CustomDateTimePicker from '../components/CustomDateTimePicker'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
-const HERO_HEADLINE = 'Find the Best Deals for Your Car Rental in Pakistan'
+const HERO_HEADLINE_STATIC = 'Find the Best Deals for Your'
+const HERO_ROTATING_PHRASES = [
+  'Car Rental in Pakistan',
+  'Within-City Rental',
+  'Out-of-City Rental',
+  'With-Driver Rental',
+  'Self-Drive Rental',
+]
+const HERO_ROTATE_INTERVAL_MS = 4000
+const HERO_ROTATE_TRANSITION_MS = 520
 const HERO_SUBHEADING = 'Rent a car anywhere in Pakistan — fast, affordable, and reliable'
 
 // Real stats fetched from backend
@@ -67,6 +76,28 @@ export default function Home() {
   const { user, loading } = useAuth()
   const isStaff = !loading && user && STAFF_ROLES.includes(user.role)
   const heroRef = useRef(null)
+
+  // Hero headline's trailing phrase — cycles on a timer, sliding+fading
+  // between phrases (odometer-style), looping indefinitely.
+  const [rotatorIndex, setRotatorIndex] = useState(0)
+  const [rotatorPrevIndex, setRotatorPrevIndex] = useState(null)
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setRotatorIndex(current => {
+        setRotatorPrevIndex(current)
+        return (current + 1) % HERO_ROTATING_PHRASES.length
+      })
+    }, HERO_ROTATE_INTERVAL_MS)
+    return () => clearInterval(intervalId)
+  }, [])
+
+  // Drop the outgoing phrase from the DOM once its exit animation finishes.
+  useEffect(() => {
+    if (rotatorPrevIndex === null) return
+    const timeoutId = setTimeout(() => setRotatorPrevIndex(null), HERO_ROTATE_TRANSITION_MS)
+    return () => clearTimeout(timeoutId)
+  }, [rotatorPrevIndex])
 
   // Trip Type: within city vs out of city
   const [tripType, setTripType] = useState('within')
@@ -291,7 +322,17 @@ export default function Home() {
             Car Rental Booking
           </p>
           <h1 className="hero-enter hero-enter-2" style={{ color: '#fff', fontWeight: 800, fontSize: 'clamp(24px, 4.5vw, 44px)', lineHeight: 1.2, marginBottom: 12 }}>
-            {HERO_HEADLINE}
+            {HERO_HEADLINE_STATIC}{' '}
+            <span className="hero-rotator">
+              {HERO_ROTATING_PHRASES.map((phrase, i) => {
+                const phraseState = i === rotatorIndex ? 'active' : i === rotatorPrevIndex ? 'exiting' : 'idle'
+                return (
+                  <span key={phrase} className={`hero-rotator-phrase hero-rotator-${phraseState}`}>
+                    {phrase}
+                  </span>
+                )
+              })}
+            </span>
           </h1>
           <p className="hero-enter hero-enter-3" style={{ color: '#b0c4d4', fontSize: 15, marginBottom: 14 }}>{HERO_SUBHEADING}</p>
           <div className="hero-proof hero-enter hero-enter-3">

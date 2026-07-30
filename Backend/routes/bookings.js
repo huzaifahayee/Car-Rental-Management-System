@@ -14,6 +14,6 @@ router.put('/:id/cancel', authenticate, authorize('CUSTOMER'), cancelBooking)
 // Assign (or reassign) a driver to a With-Driver booking, with overlap checking
 router.put('/:id/assign-driver', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), assignDriver)
 // Allow admins to permanently remove cancelled booking logs
-router.delete('/:id', authenticate, authorize('ADMIN'), deleteBooking)
+router.delete('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN'), deleteBooking)
 
 module.exports = router
