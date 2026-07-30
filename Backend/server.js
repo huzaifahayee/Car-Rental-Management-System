@@ -10,6 +10,8 @@ const outletRoutes = require("./routes/outlets")
 const driverRoutes = require("./routes/drivers")
 const userRoutes = require("./routes/users")
 const publicRoutes = require('./routes/public')
+const tenantRoutes = require('./routes/tenants')
+const { reconcileOverdueBookingsAllTenants } = require('./services/bookingReconciliation')
 const cors = require("cors")
 
 const app = express()
@@ -39,6 +41,7 @@ app.use("/outlets", outletRoutes)
 app.use("/drivers", driverRoutes)
 app.use("/users", userRoutes)
 app.use('/public', publicRoutes)
+app.use('/tenants', tenantRoutes)
 // destinations feature removed; cities are derived from outlets
 
 async function startServer() {
@@ -47,29 +50,9 @@ async function startServer() {
     await prisma.$connect()
     console.log('Connected to PostgreSQL successfully')
 
-    // Periodically reconcile overdue bookings so vehicles are released after their return time.
-    setInterval(async () => {
-      try {
-        const now = new Date()
-        const overdueConfirmedBookings = await prisma.booking.findMany({
-          where: { status: 'CONFIRMED', returnDateTime: { lte: now } },
-          select: { id: true, vehiclePackageId: true },
-        })
-        if (!overdueConfirmedBookings.length) return
-
-        const bookingIds = overdueConfirmedBookings.map((booking) => booking.id)
-        const vehicleIds = [...new Set(overdueConfirmedBookings.map((booking) => booking.vehiclePackageId))]
-
-        await prisma.$transaction([
-          prisma.booking.updateMany({ where: { id: { in: bookingIds } }, data: { status: 'COMPLETED' } }),
-          prisma.vehiclePackage.updateMany({ where: { id: { in: vehicleIds } }, data: { status: 'AVAILABLE' } }),
-        ])
-
-        console.log(`Reconciled ${bookingIds.length} overdue booking(s) at ${now.toISOString()}`)
-      } catch (reconcileErr) {
-        console.error('Failed to reconcile overdue bookings:', reconcileErr.message)
-      }
-    }, 1000 * 60 * 5)
+    // Periodically reconcile overdue bookings, across every active tenant,
+    // so vehicles are released after their return time.
+    setInterval(reconcileOverdueBookingsAllTenants, 1000 * 60 * 5)
   } catch (err) {
     console.error('Failed to connect to PostgreSQL:', err.message)
     process.exit(1)

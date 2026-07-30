@@ -35,6 +35,14 @@ async function apiFetch(path, options = {}) {
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
+    // The tenant-resolver blocks every route (including public ones) for an
+    // archived tenant's subdomain with this exact shape — redirect to a
+    // dedicated page instead of letting each caller show its own generic
+    // error. Guarded against redirect loops since this page itself still
+    // triggers a /settings call from the navbar.
+    if (data?.tenantArchived && typeof window !== 'undefined' && window.location.pathname !== '/agency-inactive') {
+      window.location.assign('/agency-inactive')
+    }
     const message = data?.error || `Request failed with status ${response.status}`
     throw new Error(message)
   }

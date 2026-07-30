@@ -7,7 +7,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import ThemeEditor from '../components/ThemeEditor'
 import AgencySettingsEditor from '../components/AgencySettingsEditor'
-import { formatCnic, formatPhone, fullNameError, phoneError, cnicError, licenseNumberError, licenseExpiryError, formatLicenseNumber, registrationPlateError, formatRegistrationPlate } from '../lib/validation'
+import { formatCnic, formatPhone, fullNameError, phoneError, cnicError, licenseNumberError, licenseExpiryError, formatLicenseNumber, registrationPlateError, formatRegistrationPlate, optionalPhoneError, emailError, optionalEmailError, urlError, businessNameError, passwordError } from '../lib/validation'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
@@ -21,6 +21,7 @@ const STATUS_COLORS = {
   MAINTENANCE: ['#ffedd5', '#c2410c'],
   INACTIVE: ['#f3f4f6', '#6b7280'],
   ACTIVE: ['#dcfce7', '#16a34a'],
+  ARCHIVED: ['#f3f4f6', '#6b7280'],
   IDLE: ['#dcfce7', '#16a34a'],
   ASSIGNED: ['#dbeafe', '#1d4ed8'],
   SUPERADMIN: ['#fae8ff', '#86198f'],
@@ -40,6 +41,13 @@ function validateDriverForm({ fullName, phone, cnic, licenseNumber, licenseExpir
 }
 
 const label = value => String(value).replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
+
+const TAB_LABELS = { users: 'Users & Staff', themes: 'Themes', settings: 'Agency Settings', tenants: 'Tenants' }
+const tabLabel = tabKey => TAB_LABELS[tabKey] || (tabKey[0].toUpperCase() + tabKey.slice(1))
+
+// Client-side preview only — the backend re-slugifies and validates
+// authoritatively, this just keeps the slug field in sync while typing.
+const slugifyPreview = value => String(value).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
 const date = value => new Intl.DateTimeFormat('en-PK', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value))
 const dateTime = value => new Intl.DateTimeFormat('en-PK', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 
@@ -174,6 +182,23 @@ export default function AdminPanel() {
   const [driverFieldErrors, setDriverFieldErrors] = useState({})
   const [driverSubmitting, setDriverSubmitting] = useState(false)
 
+  // Tenants (SUPERADMIN only)
+  const [tenants, setTenants] = useState([])
+  const [tenantsLoading, setTenantsLoading] = useState(false)
+  const [tenantsError, setTenantsError] = useState('')
+  const [showTenantModal, setShowTenantModal] = useState(false)
+  const [editingTenant, setEditingTenant] = useState(null)
+  const emptyTenantForm = { name: '', slug: '', contactEmail: '', contactPhone: '', logoUrl: '', adminFullName: '', adminEmail: '', adminPhone: '', adminPassword: '' }
+  const [tenantForm, setTenantForm] = useState(emptyTenantForm)
+  const [tenantSlugTouched, setTenantSlugTouched] = useState(false)
+  const [tenantFormError, setTenantFormError] = useState('')
+  const [tenantFieldErrors, setTenantFieldErrors] = useState({})
+  const [tenantSubmitting, setTenantSubmitting] = useState(false)
+  const [archiveTenantModal, setArchiveTenantModal] = useState(null)
+  const [archiveConfirmInput, setArchiveConfirmInput] = useState('')
+  const [archiveSubmitting, setArchiveSubmitting] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
+
   // Reusable confirmation and error modal states
   const [confirmModal, setConfirmModal] = useState({ show: false, title: '', message: '', onConfirm: null, confirmText: 'Confirm', confirmBg: 'var(--brand)' })
   const [errorModal, setErrorModal] = useState({ show: false, title: 'Error', message: '' })
@@ -241,6 +266,25 @@ export default function AdminPanel() {
     setLoading(true)
     reloadData()
   }, [user])
+
+  // Tenants isn't part of the shared reloadData() Promise.all — /tenants is
+  // SUPERADMIN-only and would 403 for every other role, so it's loaded
+  // separately and lazily, only once the Tenants tab is actually opened.
+  function loadTenants() {
+    if (user?.role !== 'SUPERADMIN') return
+    setTenantsLoading(true)
+    setTenantsError('')
+    apiFetch('/tenants')
+      .then(setTenants)
+      .catch(err => setTenantsError(err.message))
+      .finally(() => setTenantsLoading(false))
+  }
+
+  useEffect(() => {
+    if (tab === 'tenants' && user?.role === 'SUPERADMIN') {
+      loadTenants()
+    }
+  }, [tab, user])
 
   const totalBookings = stats ? Object.values(stats.bookings).reduce((sum, count) => sum + count, 0) : 0
   const pendingBookings = stats ? stats.bookings.PENDING : 0
@@ -785,6 +829,157 @@ export default function AdminPanel() {
     )
   }
 
+  // ---- Tenants (SUPERADMIN only) ----
+  function openCreateTenantModal() {
+    setEditingTenant(null)
+    setTenantForm(emptyTenantForm)
+    setTenantSlugTouched(false)
+    setTenantFormError('')
+    setTenantFieldErrors({})
+    setShowTenantModal(true)
+  }
+
+  async function openEditTenantModal(tenant) {
+    setEditingTenant(tenant)
+    setTenantFormError('')
+    setTenantFieldErrors({})
+    setShowTenantModal(true)
+    setTenantForm({ ...emptyTenantForm, name: tenant.clientName, slug: tenant.slug })
+    try {
+      const detail = await apiFetch(`/tenants/${tenant.slug}`)
+      setTenantForm(prev => ({
+        ...prev,
+        contactEmail: detail.contactEmail || '',
+        contactPhone: detail.contactPhone || '',
+        logoUrl: detail.logoUrl || '',
+      }))
+    } catch (err) {
+      setTenantFormError(`Loaded tenant, but couldn't load its current contact/branding details: ${err.message}`)
+    }
+  }
+
+  function validateTenantField(field, value, isCreate) {
+    switch (field) {
+      case 'name': return businessNameError(value)
+      case 'slug':
+        if (!value) return ''
+        return /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(value)
+          ? ''
+          : 'Slug must be lowercase letters/digits/hyphens only, 3-63 characters, and not start or end with a hyphen.'
+      case 'contactEmail': return optionalEmailError(value)
+      case 'contactPhone': return optionalPhoneError(value)
+      case 'logoUrl': return urlError(value)
+      case 'adminFullName': return isCreate ? fullNameError(value) : ''
+      case 'adminEmail': return isCreate ? emailError(value) : ''
+      case 'adminPhone': return optionalPhoneError(value)
+      case 'adminPassword': return isCreate ? (value ? passwordError(value) : 'Initial Admin password is required.') : ''
+      default: return ''
+    }
+  }
+
+  function validateTenantForm(form, isCreate) {
+    const fields = ['name', 'slug', 'contactEmail', 'contactPhone', 'logoUrl', ...(isCreate ? ['adminFullName', 'adminEmail', 'adminPhone', 'adminPassword'] : [])]
+    const errors = {}
+    for (const field of fields) {
+      const err = validateTenantField(field, form[field], isCreate)
+      if (err) errors[field] = err
+    }
+    return errors
+  }
+
+  function updateTenantField(field, value) {
+    setTenantForm(prev => {
+      const next = { ...prev, [field]: value }
+      // Auto-generate the slug from the name until the admin edits it directly.
+      if (field === 'name' && !editingTenant && !tenantSlugTouched) {
+        next.slug = slugifyPreview(value)
+      }
+      return next
+    })
+    setTenantFieldErrors(prev => ({ ...prev, [field]: validateTenantField(field, value, !editingTenant) }))
+  }
+
+  async function handleSaveTenant(e) {
+    e.preventDefault()
+    setTenantFormError('')
+
+    const { name, slug, contactEmail, contactPhone, logoUrl, adminFullName, adminEmail, adminPhone, adminPassword } = tenantForm
+    const errors = validateTenantForm(tenantForm, !editingTenant)
+    if (Object.keys(errors).length) {
+      setTenantFieldErrors(errors)
+      return
+    }
+    setTenantFieldErrors({})
+    setTenantSubmitting(true)
+
+    try {
+      if (editingTenant) {
+        await apiFetch(`/tenants/${editingTenant.slug}`, {
+          method: 'PUT',
+          body: JSON.stringify({ name: name.trim(), slug, contactEmail, contactPhone, logoUrl }),
+        })
+      } else {
+        await apiFetch('/tenants', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: name.trim(), slug, contactEmail, contactPhone, logoUrl,
+            adminFullName: adminFullName.trim(), adminEmail: adminEmail.trim(), adminPhone: adminPhone.trim() || undefined, adminPassword,
+          }),
+        })
+      }
+      setShowTenantModal(false)
+      loadTenants()
+    } catch (err) {
+      setTenantFormError(err.message)
+    } finally {
+      setTenantSubmitting(false)
+    }
+  }
+
+  function openArchiveTenantModal(tenant) {
+    setArchiveTenantModal(tenant)
+    setArchiveConfirmInput('')
+    setArchiveError('')
+  }
+
+  async function handleConfirmArchive() {
+    if (!archiveTenantModal) return
+    setArchiveSubmitting(true)
+    setArchiveError('')
+    try {
+      await apiFetch(`/tenants/${archiveTenantModal.slug}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'ARCHIVED', confirmName: archiveConfirmInput }),
+      })
+      setArchiveTenantModal(null)
+      loadTenants()
+    } catch (err) {
+      setArchiveError(err.message)
+    } finally {
+      setArchiveSubmitting(false)
+    }
+  }
+
+  function handleUnarchiveTenant(tenant) {
+    showConfirm(
+      'Unarchive Tenant',
+      `Restore "${tenant.clientName}" to active status? Sign-ins and requests on ${tenant.slug}.localhost will work again immediately.`,
+      async () => {
+        try {
+          await apiFetch(`/tenants/${tenant.slug}/status`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'ACTIVE' }),
+          })
+          loadTenants()
+        } catch (err) {
+          showError(err.message, 'Failed to Unarchive')
+        }
+      },
+      'Unarchive',
+      'var(--brand)'
+    )
+  }
+
   if (authLoading) return <PanelState title="Loading dashboard…" />
   if (!user || !STAFF_ROLES.includes(user.role)) return <Navigate to="/" replace />
   if (loading) return <PanelState title="Loading dashboard…" />
@@ -814,7 +1009,10 @@ export default function AdminPanel() {
         <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
           <aside style={{ width: 260, flexShrink: 0 }}>
             <div style={{ background: '#fff', borderRadius: 16, padding: '14px 12px', boxShadow: '0 2px 8px rgba(0,0,0,.06)' }}>
-             {['overview', 'bookings', 'vehicles', 'drivers', 'outlets', 'users', 'settings', 'themes'].map(item => (
+             {[
+               'overview', 'bookings', 'vehicles', 'drivers', 'outlets', 'users', 'settings', 'themes',
+               ...(user.role === 'SUPERADMIN' ? ['tenants'] : []),
+             ].map(item => (
                 <button
                   key={item}
                   onClick={() => setTab(item)}
@@ -827,7 +1025,7 @@ export default function AdminPanel() {
                     transition: 'background 0.15s ease, color 0.15s ease',
                   }}
                 >
-            {item === 'users' ? 'Users & Staff' : item === 'themes' ? 'Themes' : item === 'settings' ? 'Agency Settings' : item[0].toUpperCase() + item.slice(1)}
+            {tabLabel(item)}
                 </button>
               ))}
             </div>
@@ -837,7 +1035,7 @@ export default function AdminPanel() {
             {/* Prominent heading for currently selected sidebar item moved to TOP */}
             <div style={{ marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0f172a' }}>
-             {tab === 'users' ? 'Users & Staff' : tab === 'themes' ? 'Themes' : tab === 'settings' ? 'Agency Settings' : tab[0].toUpperCase() + tab.slice(1)}
+             {tabLabel(tab)}
               </h2>
             </div>
 
@@ -970,6 +1168,39 @@ export default function AdminPanel() {
                   onRoleChange={handleRoleChangeInitiate}
                   onDeleteUser={handleDeleteUserInitiate}
                 />
+              </DataCard>
+            )}
+
+            {tab === 'tenants' && user.role === 'SUPERADMIN' && (
+              <DataCard
+                title={`Tenants (${tenants.length})`}
+                action={
+                  <button
+                    onClick={openCreateTenantModal}
+                    style={{
+                      background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                      borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                      fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    + Create Tenant
+                  </button>
+                }
+              >
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748b' }}>
+                  You're currently browsing on <strong style={{ color: 'var(--brand-2)' }}>{typeof window !== 'undefined' ? window.location.hostname : ''}</strong>.
+                  This list is the same regardless of which tenant subdomain you're on.
+                </p>
+                {tenantsLoading && <p style={{ color: '#8b95a1', fontSize: 13 }}>Loading tenants…</p>}
+                {tenantsError && <p style={{ color: '#c53030', fontSize: 13 }}>{tenantsError}</p>}
+                {!tenantsLoading && !tenantsError && (
+                  <TenantsTable
+                    tenants={tenants}
+                    onEdit={openEditTenantModal}
+                    onArchive={openArchiveTenantModal}
+                    onUnarchive={handleUnarchiveTenant}
+                  />
+                )}
               </DataCard>
             )}
           </div>
@@ -1752,6 +1983,143 @@ export default function AdminPanel() {
           onConfirm={handleApproveWithDriver}
         />
       )}
+
+      {/* Tenant Create / Edit Modal */}
+      {showTenantModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e' }}>
+                {editingTenant ? 'Edit Tenant' : 'Create Tenant'}
+              </h2>
+              <button onClick={() => setShowTenantModal(false)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+
+            <form onSubmit={handleSaveTenant} style={{ display: 'grid', gap: 14 }}>
+              <div>
+                <label style={modalLabel}>Tenant / Agency Name</label>
+                <input type="text" value={tenantForm.name} onChange={e => updateTenantField('name', e.target.value)} placeholder="e.g. Al Rafay Motors" required style={{ ...modalInput, borderColor: tenantFieldErrors.name ? '#dc2626' : '#d8e0e5' }} />
+                {tenantFieldErrors.name && <p className="field-error">{tenantFieldErrors.name}</p>}
+              </div>
+
+              <div>
+                <label style={modalLabel}>Subdomain / Slug</label>
+                <input
+                  type="text"
+                  value={tenantForm.slug}
+                  onChange={e => { setTenantSlugTouched(true); updateTenantField('slug', slugifyPreview(e.target.value)) }}
+                  placeholder="al-rafay-motors"
+                  style={{ ...modalInput, borderColor: tenantFieldErrors.slug ? '#dc2626' : '#d8e0e5' }}
+                />
+                <p style={{ fontSize: 12, color: '#8b95a1', margin: '4px 0 0' }}>{tenantForm.slug || '...'}.localhost</p>
+                {editingTenant && <p style={{ fontSize: 12, color: '#a16207', margin: '4px 0 0' }}>Changing this changes the tenant's live subdomain — old links/bookmarks to {editingTenant.slug}.localhost will stop working.</p>}
+                {tenantFieldErrors.slug && <p className="field-error">{tenantFieldErrors.slug}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label style={modalLabel}>Contact Email</label>
+                  <input type="email" value={tenantForm.contactEmail} onChange={e => updateTenantField('contactEmail', e.target.value)} placeholder="contact@agency.com" style={{ ...modalInput, borderColor: tenantFieldErrors.contactEmail ? '#dc2626' : '#d8e0e5' }} />
+                  {tenantFieldErrors.contactEmail && <p className="field-error">{tenantFieldErrors.contactEmail}</p>}
+                </div>
+                <div>
+                  <label style={modalLabel}>Contact Phone</label>
+                  <input type="tel" value={tenantForm.contactPhone} onChange={e => updateTenantField('contactPhone', e.target.value)} placeholder="03001234567" style={{ ...modalInput, borderColor: tenantFieldErrors.contactPhone ? '#dc2626' : '#d8e0e5' }} />
+                  {tenantFieldErrors.contactPhone && <p className="field-error">{tenantFieldErrors.contactPhone}</p>}
+                </div>
+              </div>
+
+              <div>
+                <label style={modalLabel}>Logo URL</label>
+                <input type="url" value={tenantForm.logoUrl} onChange={e => updateTenantField('logoUrl', e.target.value)} placeholder="https://... (optional)" style={{ ...modalInput, borderColor: tenantFieldErrors.logoUrl ? '#dc2626' : '#d8e0e5' }} />
+                {tenantFieldErrors.logoUrl && <p className="field-error">{tenantFieldErrors.logoUrl}</p>}
+              </div>
+
+              {!editingTenant && (
+                <>
+                  <div style={{ borderTop: '1px solid #eef1f4', paddingTop: 14, marginTop: 4 }}>
+                    <p style={{ ...modalLabel, marginBottom: 12 }}>Initial Admin Account</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label style={modalLabel}>Admin Full Name</label>
+                      <input type="text" value={tenantForm.adminFullName} onChange={e => updateTenantField('adminFullName', e.target.value)} required style={{ ...modalInput, borderColor: tenantFieldErrors.adminFullName ? '#dc2626' : '#d8e0e5' }} />
+                      {tenantFieldErrors.adminFullName && <p className="field-error">{tenantFieldErrors.adminFullName}</p>}
+                    </div>
+                    <div>
+                      <label style={modalLabel}>Admin Phone</label>
+                      <input type="tel" value={tenantForm.adminPhone} onChange={e => updateTenantField('adminPhone', e.target.value)} placeholder="03001234567" style={{ ...modalInput, borderColor: tenantFieldErrors.adminPhone ? '#dc2626' : '#d8e0e5' }} />
+                      {tenantFieldErrors.adminPhone && <p className="field-error">{tenantFieldErrors.adminPhone}</p>}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label style={modalLabel}>Admin Email</label>
+                      <input type="email" value={tenantForm.adminEmail} onChange={e => updateTenantField('adminEmail', e.target.value)} required style={{ ...modalInput, borderColor: tenantFieldErrors.adminEmail ? '#dc2626' : '#d8e0e5' }} />
+                      {tenantFieldErrors.adminEmail && <p className="field-error">{tenantFieldErrors.adminEmail}</p>}
+                    </div>
+                    <div>
+                      <label style={modalLabel}>Admin Password</label>
+                      <input type="password" value={tenantForm.adminPassword} onChange={e => updateTenantField('adminPassword', e.target.value)} required style={{ ...modalInput, borderColor: tenantFieldErrors.adminPassword ? '#dc2626' : '#d8e0e5' }} />
+                      {tenantFieldErrors.adminPassword && <p className="field-error">{tenantFieldErrors.adminPassword}</p>}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {tenantFormError && <p style={{ color: '#c53030', fontSize: 13, margin: 0 }}>{tenantFormError}</p>}
+
+              <div className="flex justify-end gap-3 mt-3">
+                <button type="button" onClick={() => setShowTenantModal(false)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+                <button type="submit" disabled={tenantSubmitting} style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: tenantSubmitting ? 0.7 : 1 }}>
+                  {tenantSubmitting ? 'Saving...' : editingTenant ? 'Save Changes' : 'Create Tenant'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Tenant Modal — GitHub-style type-to-confirm */}
+      {archiveTenantModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalCardStyle}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 style={{ margin: 0, fontSize: 18, color: '#dc2626' }}>Archive Tenant</h2>
+              <button onClick={() => setArchiveTenantModal(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>×</button>
+            </div>
+
+            <p style={{ fontSize: 14, color: '#444', margin: '0 0 16px' }}>
+              Archiving <strong>{archiveTenantModal.clientName}</strong> immediately blocks all sign-ins and requests on <strong>{archiveTenantModal.slug}.localhost</strong>. The database itself is not touched or deleted — you can unarchive later.
+            </p>
+
+            <label style={modalLabel}>
+              Type <strong>{archiveTenantModal.clientName}</strong> to confirm
+            </label>
+            <input
+              type="text"
+              value={archiveConfirmInput}
+              onChange={e => setArchiveConfirmInput(e.target.value)}
+              style={modalInput}
+              autoFocus
+            />
+
+            {archiveError && <p style={{ color: '#c53030', fontSize: 13, margin: '10px 0 0' }}>{archiveError}</p>}
+
+            <div className="flex justify-end gap-3 mt-4">
+              <button type="button" onClick={() => setArchiveTenantModal(null)} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
+              <button
+                type="button"
+                onClick={handleConfirmArchive}
+                disabled={archiveSubmitting || archiveConfirmInput !== archiveTenantModal.clientName}
+                style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: (archiveSubmitting || archiveConfirmInput !== archiveTenantModal.clientName) ? 0.5 : 1 }}
+              >
+                {archiveSubmitting ? 'Archiving...' : 'Archive Tenant'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2520,6 +2888,46 @@ function UsersTable({ usersList, currentUser, onRoleChange, onDeleteUser }) {
             )
           }) : (
             <tr><td colSpan="7" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No user accounts found.</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function TenantsTable({ tenants, onEdit, onArchive, onUnarchive }) {
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            {['Name', 'Subdomain', 'Status', 'Created', 'Actions'].map(heading => (
+              <th key={heading} style={th}>{heading}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {tenants.length ? tenants.map(t => (
+            <tr key={t.slug} style={{ borderTop: '1px solid #f1f3f5' }}>
+              <td style={td}><strong>{t.clientName}</strong></td>
+              <td style={td}>{t.slug}.localhost</td>
+              <td style={td}><Badge value={t.status} /></td>
+              <td style={td}>{date(t.createdAt)}</td>
+              <td style={td}>
+                <div className="flex gap-2">
+                  <button onClick={() => onEdit(t)} style={{ background: '#f3f4f6', color: '#333', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+                  {t.status === 'ARCHIVED' ? (
+                    <button onClick={() => onUnarchive(t)} style={{ background: '#dcfce7', color: '#16a34a', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Unarchive</button>
+                  ) : (
+                    t.slug !== 'default' && (
+                      <button onClick={() => onArchive(t)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Archive</button>
+                    )
+                  )}
+                </div>
+              </td>
+            </tr>
+          )) : (
+            <tr><td colSpan="5" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No tenants yet. Click "+ Create Tenant" to add one.</td></tr>
           )}
         </tbody>
       </table>

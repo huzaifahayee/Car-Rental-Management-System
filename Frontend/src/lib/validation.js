@@ -24,6 +24,48 @@ export function phoneError(value) {
   return ''
 }
 
+// Same format check as phoneError, but an empty value is allowed — for
+// optional phone fields (e.g. agency contact phone).
+export function optionalPhoneError(value) {
+  if (!value || !value.trim()) return ''
+  if (!isValidPhone(value)) return 'Enter a valid Pakistani mobile number (e.g. 03001234567 or +923001234567).'
+  return ''
+}
+
+export function emailError(value) {
+  if (!value || !value.trim()) return 'Email is required.'
+  if (!isValidEmail(value)) return 'Enter a valid email address.'
+  return ''
+}
+
+// Empty value allowed — for optional contact-email fields.
+export function optionalEmailError(value) {
+  if (!value || !value.trim()) return ''
+  if (!isValidEmail(value)) return 'Enter a valid email address.'
+  return ''
+}
+
+export function urlError(value) {
+  if (!value || !value.trim()) return ''
+  try {
+    const parsed = new URL(value.trim())
+    if (!['http:', 'https:'].includes(parsed.protocol)) return 'URL must start with http:// or https://.'
+  } catch {
+    return 'Enter a valid URL (e.g. https://example.com/logo.png).'
+  }
+  return ''
+}
+
+// Business/agency name — looser than fullNameError since company names
+// commonly include digits, ampersands, and other punctuation a person's
+// name wouldn't.
+export function businessNameError(value) {
+  if (!value || !value.trim()) return 'Name is required.'
+  const trimmed = value.trim()
+  if (trimmed.length < 2 || trimmed.length > 100) return 'Name must be 2-100 characters.'
+  return ''
+}
+
 export function isValidCnic(value) {
   if (!value || typeof value !== 'string') return false
   const digits = value.replace(/-/g, '').trim()

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
-import { phoneError, cnicError, formatCnic } from '../lib/validation'
+import { phoneError, cnicError, formatCnic, passwordError } from '../lib/validation'
 
 export default function Profile() {
   const { user, updateUser, loading: authLoading } = useAuth()
@@ -18,6 +18,14 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({})
+  const [passwordFormError, setPasswordFormError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     if (!user) return
@@ -70,11 +78,16 @@ export default function Profile() {
           cnic: cnic.replace(/-/g, ''),
         }),
       })
-      updateUser(updated)
+      const { syncWarnings, ...updatedUser } = updated
+      updateUser(updatedUser)
       setFullName(updated.fullName || '')
       setPhone(updated.phone || '')
       setCnic(updated.cnic ? formatCnic(updated.cnic) : '')
-      setSuccess('Profile updated successfully. Redirecting…')
+      setSuccess(
+        updated.syncWarnings?.length
+          ? `Profile updated. Note: ${updated.syncWarnings.join(' ')}`
+          : 'Profile updated successfully. Redirecting…'
+      )
 
       // If we were sent here from another page (e.g. BookVehicle asking for
       // a missing CNIC), take the user back there. Otherwise, go home.
@@ -86,6 +99,45 @@ export default function Profile() {
       setError(err.message)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault()
+    const errors = {}
+    if (!currentPassword) errors.currentPassword = 'Current password is required.'
+    const newPwErr = passwordError(newPassword)
+    if (newPwErr) errors.newPassword = newPwErr
+    if (newPassword && confirmNewPassword !== newPassword) errors.confirmNewPassword = 'Passwords do not match.'
+
+    if (Object.keys(errors).length) {
+      setPasswordFieldErrors(errors)
+      setPasswordFormError('')
+      setPasswordSuccess('')
+      return
+    }
+    setPasswordFieldErrors({})
+    setPasswordFormError('')
+    setPasswordSuccess('')
+    setChangingPassword(true)
+
+    try {
+      const result = await apiFetch('/users/me/password', {
+        method: 'PUT',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+      setPasswordSuccess(
+        result.syncWarnings?.length
+          ? `Password updated. Note: ${result.syncWarnings.join(' ')}`
+          : 'Password updated successfully.'
+      )
+    } catch (err) {
+      setPasswordFormError(err.message)
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -219,6 +271,93 @@ export default function Profile() {
             </form>
           )}
         </div>
+
+        {!loading && (
+          <div style={{ background: '#fff', borderRadius: 20, boxShadow: '0 8px 40px rgba(0,0,0,0.1)', padding: '40px 36px', marginTop: 24 }}>
+            <div className="mb-8">
+              <h2 style={{ fontWeight: 800, fontSize: 20, color: '#1a1a2e', marginBottom: 6 }}>Change Password</h2>
+              <p style={{ color: '#888', fontSize: 14 }}>
+                {user.role === 'SUPERADMIN'
+                  ? "Your account is duplicated across every agency's database — changing your password here syncs it everywhere automatically."
+                  : 'Update the password used to sign in.'}
+              </p>
+            </div>
+
+            {passwordFormError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 20 }}>
+                {passwordFormError}
+              </div>
+            )}
+            {passwordSuccess && (
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 14px', color: '#15803d', fontSize: 13, marginBottom: 20 }}>
+                {passwordSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div>
+                <label style={labelStyle}>Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  style={{ ...inputStyle, borderColor: passwordFieldErrors.currentPassword ? '#dc2626' : '#e0e0e0' }}
+                  onFocus={focusHandler}
+                  onBlur={blurHandler}
+                />
+                {passwordFieldErrors.currentPassword && <p className="field-error">{passwordFieldErrors.currentPassword}</p>}
+              </div>
+
+              <div>
+                <label style={labelStyle}>New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  required
+                  style={{ ...inputStyle, borderColor: passwordFieldErrors.newPassword ? '#dc2626' : '#e0e0e0' }}
+                  onFocus={focusHandler}
+                  onBlur={blurHandler}
+                />
+                {passwordFieldErrors.newPassword && <p className="field-error">{passwordFieldErrors.newPassword}</p>}
+              </div>
+
+              <div>
+                <label style={labelStyle}>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={e => setConfirmNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  required
+                  style={{ ...inputStyle, borderColor: passwordFieldErrors.confirmNewPassword ? '#dc2626' : '#e0e0e0' }}
+                  onFocus={focusHandler}
+                  onBlur={blurHandler}
+                />
+                {passwordFieldErrors.confirmNewPassword && <p className="field-error">{passwordFieldErrors.confirmNewPassword}</p>}
+              </div>
+
+              <button
+                type="submit"
+                disabled={changingPassword}
+                style={{
+                  background: 'linear-gradient(90deg, var(--brand), var(--brand-2))',
+                  color: '#fff', border: 'none', borderRadius: 12,
+                  padding: '13px', fontWeight: 800, fontSize: 15,
+                  cursor: changingPassword ? 'default' : 'pointer', marginTop: 4,
+                  boxShadow: '0 4px 20px rgba(var(--brand-rgb),0.35)',
+                  opacity: changingPassword ? 0.7 : 1,
+                  transition: 'all 0.2s',
+                }}
+              >
+                {changingPassword ? 'Updating…' : 'Update Password'}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   )

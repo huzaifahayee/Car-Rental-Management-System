@@ -1,5 +1,6 @@
-const { hashPassword } = require('../utils/auth')
+const { hashPassword, comparePassword } = require('../utils/auth')
 const { normalizeCnic, isValidCnic } = require('../utils/validators')
+const { propagateSuperAdminUpdate } = require('../services/superadminSync')
 
 const VALID_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE', 'CUSTOMER']
 const NAME_REGEX = /^[\p{L}][\p{L}\s.'-]*$/u
@@ -215,10 +216,58 @@ async function updateMe(req, res) {
       data,
       select: PROFILE_SELECT,
     })
-    res.json(updated)
+
+    let syncWarnings
+    // SuperAdmin's account is duplicated across every tenant DB — keep the
+    // duplicates in sync rather than only updating the tenant they're
+    // currently acting from.
+    if (updated.role === 'SUPERADMIN') {
+      const { failed } = await propagateSuperAdminUpdate(updated.email, data, { excludeTenantId: req.tenantId })
+      if (failed.length > 0) {
+        syncWarnings = failed.map(f => `Could not sync this change to tenant "${f.tenantId}": ${f.error}`)
+      }
+    }
+
+    res.json({ ...updated, ...(syncWarnings ? { syncWarnings } : {}) })
   } catch (err) {
     res.status(500).json({ error: 'Failed to update profile', details: err.message })
   }
 }
 
-module.exports = { getUsers, createUser, updateUserRole, deleteUser, getMe, updateMe }
+async function changePassword(req, res) {
+  const { currentPassword, newPassword } = req.body
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'currentPassword and newPassword are required.' })
+  }
+  if (newPassword.length < 8 || newPassword.length > 72) {
+    return res.status(400).json({ error: 'New password must be 8-72 characters.' })
+  }
+
+  try {
+    const user = await req.prisma.user.findUnique({ where: { id: req.user.userId } })
+    if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    const matches = await comparePassword(currentPassword, user.passwordHash)
+    if (!matches) {
+      return res.status(401).json({ error: 'Current password is incorrect.' })
+    }
+
+    const passwordHash = await hashPassword(newPassword)
+    await req.prisma.user.update({ where: { id: user.id }, data: { passwordHash } })
+
+    let syncWarnings
+    if (user.role === 'SUPERADMIN') {
+      const { failed } = await propagateSuperAdminUpdate(user.email, { passwordHash }, { excludeTenantId: req.tenantId })
+      if (failed.length > 0) {
+        syncWarnings = failed.map(f => `Could not sync this change to tenant "${f.tenantId}": ${f.error}`)
+      }
+    }
+
+    res.json({ message: 'Password updated successfully.', ...(syncWarnings ? { syncWarnings } : {}) })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change password', details: err.message })
+  }
+}
+
+module.exports = { getUsers, createUser, updateUserRole, deleteUser, getMe, updateMe, changePassword }
