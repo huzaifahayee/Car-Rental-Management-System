@@ -168,6 +168,14 @@ async function setTenantStatus(req, res) {
   const nextTenants = { ...tenants, [slug]: { ...tenant, status } }
   tenantsStore.writeTenants(nextTenants)
 
+  // Drop the cached connection pool for an archived tenant — no one can
+  // reach it via the resolver anymore anyway, so there's no reason to keep
+  // it open. Unarchiving needs no matching step: getPrismaClientForTenant
+  // lazily rebuilds the client on the next request that reaches this tenant.
+  if (status === 'ARCHIVED') {
+    await tenantResolver.evictTenantClient(slug)
+  }
+
   res.json(toPublicTenant(nextTenants[slug]))
 }
 
