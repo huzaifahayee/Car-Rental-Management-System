@@ -16,4 +16,13 @@ async function getPublicStats(req, res) {
   }
 }
 
-module.exports = { getPublicStats }
+async function getDriverAvailability(req, res) {
+  try {
+    const idleDriverCount = await req.prisma.driver.count({ where: { status: 'IDLE' } })
+    res.json({ available: idleDriverCount > 0 })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check driver availability', details: err.message })
+  }
+}
+
+module.exports = { getPublicStats, getDriverAvailability }

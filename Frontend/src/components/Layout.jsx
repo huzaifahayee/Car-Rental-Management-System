@@ -8,15 +8,15 @@ import { applyThemeFromName } from '../lib/theme'
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
-const adminPanelLinkStyle = (active) => ({
-  background: active ? 'var(--brand-2)' : 'var(--brand)',
+const adminPanelLinkStyle = {
+  background: 'var(--brand)',
   color: 'var(--surface)',
   borderRadius: 8,
   padding: '8px 16px',
   fontSize: 14,
   fontWeight: 700,
   textDecoration: 'none',
-})
+}
 
 export default function Layout() {
   const location = useLocation()
@@ -24,7 +24,6 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/register'
   const isStaffUser = user && STAFF_ROLES.includes(user.role)
-  const isAdminRoute = location.pathname.startsWith('/admin')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
@@ -137,11 +136,11 @@ export default function Layout() {
       <header style={{ background: '#fff', borderBottom: '1px solid #e8e8e8', position: 'sticky', top: 0, zIndex: 50 }}>
         <div className="w-full px-6 md:px-10 flex items-center justify-between py-4">
           <Link to="/" onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ background: 'var(--brand)', borderRadius: 8, width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--brand)', borderRadius: 10, width: 48, height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
               {agencyLogoUrl ? (
                 <img src={agencyLogoUrl} alt={agencyName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 18 }}>{agencyName.charAt(0).toUpperCase()}</span>
+                <span style={{ color: 'var(--surface)', fontWeight: 900, fontSize: 22 }}>{agencyName.charAt(0).toUpperCase()}</span>
               )}
             </div>
             <div>
@@ -152,7 +151,7 @@ export default function Layout() {
 
           <nav className="hidden md:flex items-center gap-6">
             {isStaffUser ? (
-              <Link to="/admin" style={adminPanelLinkStyle(isAdminRoute)}>Admin Panel</Link>
+              <Link to="/admin" style={adminPanelLinkStyle}>Admin Panel</Link>
             ) : (
               <>
                 <Link to={'/#destinations'} onClick={() => { closeUserMenu(); closeMobileMenu() }} style={{ color: '#444', fontSize: 14, fontWeight: 500, textDecoration: 'none' }}>Destinations</Link>

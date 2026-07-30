@@ -1,11 +1,12 @@
-const { getBusyDriverIds } = require('../utils/driverAvailability')
-
 // Same conventions as userController.js's fullName/phone validation
 const NAME_REGEX = /^[\p{L}][\p{L}\s.'-]*$/u
 const PHONE_REGEX = /^(\+92|92|0)3\d{9}$/
-const VALID_STATUSES = ['ACTIVE', 'INACTIVE']
+const CNIC_REGEX = /^\d{5}-\d{7}-\d{1}$/
+// City/authority code - 4-digit year - 4-7 digit sequence, e.g. LHR-2024-123456
+const LICENSE_REGEX = /^[A-Za-z]{3}-\d{4}-\d{4,7}$/
+const VALID_STATUSES = ['IDLE', 'ASSIGNED', 'INACTIVE']
 
-function validateDriverPayload({ fullName, phone }) {
+function validateDriverPayload({ fullName, phone, cnic, licenseNumber, licenseExpiry }) {
   const errors = []
 
   if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
@@ -26,29 +27,29 @@ function validateDriverPayload({ fullName, phone }) {
     }
   }
 
+  if (!cnic || typeof cnic !== 'string' || !CNIC_REGEX.test(cnic.trim())) {
+    errors.push('Enter a valid CNIC in the format 12345-1234567-1.')
+  }
+
+  if (!licenseNumber || typeof licenseNumber !== 'string' || !LICENSE_REGEX.test(licenseNumber.trim())) {
+    errors.push('Enter a valid license number in the format LHR-2024-123456 (city code-year-sequence).')
+  }
+
+  if (!licenseExpiry || isNaN(new Date(licenseExpiry).getTime())) {
+    errors.push('A valid license expiry date is required.')
+  }
+
   return errors
 }
 
 async function getDrivers(req, res) {
-  const { status, available, pickupDateTime, returnDateTime, excludeBookingId } = req.query
+  const { status } = req.query
 
   const where = {}
   if (status && VALID_STATUSES.includes(status)) where.status = status
 
   try {
-    let drivers = await req.prisma.driver.findMany({ where, orderBy: { createdAt: 'desc' } })
-
-    if (available === 'true') {
-      if (!pickupDateTime || !returnDateTime) {
-        return res.status(400).json({ error: 'pickupDateTime and returnDateTime are required to filter by availability.' })
-      }
-      // excludeBookingId lets a caller re-check availability for a booking that
-      // already has this driver assigned, so the driver's own booking doesn't
-      // make them look busy against themselves.
-      const busyDriverIds = await getBusyDriverIds(req.prisma, pickupDateTime, returnDateTime, excludeBookingId)
-      drivers = drivers.filter((driver) => driver.status === 'ACTIVE' && !busyDriverIds.has(driver.id))
-    }
-
+    const drivers = await req.prisma.driver.findMany({ where, orderBy: { createdAt: 'desc' } })
     res.json(drivers)
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch drivers', details: err.message })
@@ -66,9 +67,9 @@ async function getDriverById(req, res) {
 }
 
 async function createDriver(req, res) {
-  const { fullName, phone } = req.body
+  const { fullName, phone, cnic, licenseNumber, licenseExpiry } = req.body
 
-  const errors = validateDriverPayload({ fullName, phone })
+  const errors = validateDriverPayload({ fullName, phone, cnic, licenseNumber, licenseExpiry })
   if (errors.length > 0) {
     return res.status(400).json({ error: errors.join(' ') })
   }
@@ -78,18 +79,24 @@ async function createDriver(req, res) {
       data: {
         fullName: fullName.trim().replace(/\s+/g, ' '),
         phone: phone.trim(),
+        cnic: cnic.trim(),
+        licenseNumber: licenseNumber.trim().toUpperCase(),
+        licenseExpiry: new Date(licenseExpiry),
       },
     })
     res.status(201).json(driver)
   } catch (err) {
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'A driver with this CNIC or license number already exists.' })
+    }
     res.status(500).json({ error: 'Failed to create driver', details: err.message })
   }
 }
 
 async function updateDriver(req, res) {
-  const { fullName, phone, status } = req.body
+  const { fullName, phone, cnic, licenseNumber, licenseExpiry, status } = req.body
 
-  const errors = validateDriverPayload({ fullName, phone })
+  const errors = validateDriverPayload({ fullName, phone, cnic, licenseNumber, licenseExpiry })
   if (errors.length > 0) {
     return res.status(400).json({ error: errors.join(' ') })
   }
@@ -104,6 +111,9 @@ async function updateDriver(req, res) {
       data: {
         fullName: fullName.trim().replace(/\s+/g, ' '),
         phone: phone.trim(),
+        cnic: cnic.trim(),
+        licenseNumber: licenseNumber.trim().toUpperCase(),
+        licenseExpiry: new Date(licenseExpiry),
         ...(status !== undefined ? { status } : {}),
       },
     })
@@ -111,6 +121,9 @@ async function updateDriver(req, res) {
   } catch (err) {
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'Driver not found.' })
+    }
+    if (err.code === 'P2002') {
+      return res.status(409).json({ error: 'A driver with this CNIC or license number already exists.' })
     }
     res.status(500).json({ error: 'Failed to update driver', details: err.message })
   }

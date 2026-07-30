@@ -59,6 +59,23 @@ export default function BookVehicle() {
   const [booking, setBooking] = useState(null)
   const [showConfirm, setShowConfirm] = useState(false)
 
+  // Re-verify a driver is still idle before letting a With-Driver booking go
+  // through — availability may have changed since the customer picked this
+  // mode on the search page, or they may have landed here directly.
+  const [driverAvailable, setDriverAvailable] = useState(true)
+  const [checkingDriverAvailability, setCheckingDriverAvailability] = useState(true)
+
+  useEffect(() => {
+    if (rentalMode !== 'WITH_DRIVER') {
+      setCheckingDriverAvailability(false)
+      return
+    }
+    apiFetch('/public/driver-availability')
+      .then(data => setDriverAvailable(!!data.available))
+      .catch(() => setDriverAvailable(true))
+      .finally(() => setCheckingDriverAvailability(false))
+  }, [rentalMode])
+
   const confirmSummary = pickupDateTime && returnDateTime
     ? `Confirm booking for ${vehicle?.make} ${vehicle?.model} from ${new Date(pickupDateTime).toLocaleString()} to ${new Date(returnDateTime).toLocaleString()}.`
     : 'Please review your trip details before confirming.'
@@ -120,6 +137,9 @@ export default function BookVehicle() {
 
     if (rentalMode === 'WITH_DRIVER') {
       if (!pickupAddress.trim()) return setError('Please enter a valid pickup address for With-Driver booking.')
+      if (!checkingDriverAvailability && !driverAvailable) {
+        return setError('No driver is currently available. Please go back and choose Self-Drive instead.')
+      }
     } else if (rentalMode === 'SELF_DRIVE') {
       if (!outletId) return setError('Please select a branch outlet for Self-Drive booking.')
     }
@@ -233,6 +253,12 @@ export default function BookVehicle() {
                   </div>
                 </Field>
 
+                {rentalMode === 'WITH_DRIVER' && !checkingDriverAvailability && !driverAvailable && (
+                  <p style={{ color: '#dc2626', fontSize: 13, fontWeight: 600, background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', margin: '0 0 4px' }}>
+                    No driver is currently available. Please go back and choose Self-Drive instead.
+                  </p>
+                )}
+
                 {/* Location Inputs based on Rental Mode */}
                 {rentalMode === 'WITH_DRIVER' ? (
                   <>
@@ -334,7 +360,10 @@ export default function BookVehicle() {
                 )}
                 {error && <p style={{ margin: 0, color: '#c53030', fontSize: 13 }}>{error}</p>}
 
-                <button disabled={submitting} style={{ ...buttonStyle, opacity: submitting ? 0.65 : 1 }}>
+                <button
+                  disabled={submitting || (rentalMode === 'WITH_DRIVER' && !checkingDriverAvailability && !driverAvailable)}
+                  style={{ ...buttonStyle, opacity: (submitting || (rentalMode === 'WITH_DRIVER' && !checkingDriverAvailability && !driverAvailable)) ? 0.65 : 1 }}
+                >
                   {submitting ? 'Confirming booking…' : 'Confirm booking'}
                 </button>
               </form>

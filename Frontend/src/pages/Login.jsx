@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { isValidEmail } from '../lib/validation'
+import AuthAvatar from '../components/AuthAvatar'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
@@ -58,9 +59,7 @@ export default function Login() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div style={{ background: 'var(--brand)', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>G</span>
-            </div>
+            <AuthAvatar />
             <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Hello!</h1>
             <p style={{ color: '#888', fontSize: 14 }}>Sign in to your account to continue</p>
           </div>

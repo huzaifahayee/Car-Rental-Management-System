@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(bash -lc 'which node npm npx' 2>&1)",
+      "Bash(xargs -I{} sh -c 'echo {}; cat {}')"
+    ]
+  }
+}

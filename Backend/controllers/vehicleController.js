@@ -1,4 +1,17 @@
 const { uploadBufferToCloudinary } = require('../utils/cloudinaryUpload')
+
+const PLATE_REGEX = /^[A-Z]{3}-\d{4}$/
+
+function validatePlateAndImages({ registrationPlate, imageUrls }) {
+  const errors = []
+  if (!registrationPlate || typeof registrationPlate !== 'string' || !PLATE_REGEX.test(registrationPlate.trim())) {
+    errors.push('Registration plate is required and must be 3 letters followed by 4 digits, e.g. ABC-1234.')
+  }
+  if (!Array.isArray(imageUrls) || imageUrls.filter(url => typeof url === 'string' && url.trim()).length === 0) {
+    errors.push('At least one vehicle image (uploaded file or image URL) is required.')
+  }
+  return errors
+}
 async function reconcileVehicleStatuses(req, res, next) {
   try {
     const confirmedBookings = await req.prisma.booking.findMany({
@@ -63,6 +76,12 @@ async function createVehicle(req, res) {
   if (!category || !make || !model || !seatingCapacity || !transmission || pricePerDay == null || !pickupCity || !dropoffCity) {
     return res.status(400).json({ error: 'Missing required vehicle fields.' })
   }
+
+  const errors = validatePlateAndImages({ registrationPlate, imageUrls })
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors.join(' ') })
+  }
+
   try {
     const vehicle = await req.prisma.vehiclePackage.create({
       data: {
@@ -71,7 +90,7 @@ async function createVehicle(req, res) {
         model,
         variant: variant || null,
         year: year != null ? Number(year) : null,
-        registrationPlate: registrationPlate || null,
+        registrationPlate: registrationPlate.trim().toUpperCase(),
         seatingCapacity,
         transmission,
         hasAC,
@@ -90,12 +109,24 @@ async function createVehicle(req, res) {
 
 async function updateVehicle(req, res) {
   const { category, make, model, variant, year, registrationPlate, seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status, imageUrls } = req.body
+
+  const errors = []
+  if (registrationPlate !== undefined && (!registrationPlate || !PLATE_REGEX.test(registrationPlate.trim()))) {
+    errors.push('Registration plate is required and must be 3 letters followed by 4 digits, e.g. ABC-1234.')
+  }
+  if (imageUrls !== undefined && (!Array.isArray(imageUrls) || imageUrls.filter(url => typeof url === 'string' && url.trim()).length === 0)) {
+    errors.push('At least one vehicle image (uploaded file or image URL) is required.')
+  }
+  if (errors.length > 0) {
+    return res.status(400).json({ error: errors.join(' ') })
+  }
+
   try {
     const updateData = {
       category, make, model,
       variant: variant !== undefined ? (variant || null) : undefined,
       year: year !== undefined ? (year != null ? Number(year) : null) : undefined,
-      registrationPlate: registrationPlate !== undefined ? (registrationPlate || null) : undefined,
+      registrationPlate: registrationPlate !== undefined ? registrationPlate.trim().toUpperCase() : undefined,
       seatingCapacity, transmission, hasAC, driverOption, pricePerDay, pickupCity, dropoffCity, status,
     }
     if (Array.isArray(imageUrls)) {
@@ -163,4 +194,21 @@ async function uploadVehicleImages(req, res) {
   }
 }
 
-module.exports = { getVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle, uploadVehicleImages }
+// Uploads a single image ahead of vehicle create/update (no vehicle id needed
+// yet) so the resulting URL can be included in the same create/update
+// request — letting that request validate "image required" atomically
+// instead of relying on a second follow-up call.
+async function uploadVehicleImageStandalone(req, res) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No image uploaded.' })
+  }
+  try {
+    const result = await uploadBufferToCloudinary(req.file.buffer, 'garitrip/vehicles')
+    res.json({ url: result.secure_url })
+  } catch (err) {
+    console.error('Vehicle image upload failed:', err)
+    res.status(500).json({ error: 'Failed to upload image', details: err.message })
+  }
+}
+
+module.exports = { getVehicles, getVehicleById, createVehicle, updateVehicle, deleteVehicle, uploadVehicleImages, uploadVehicleImageStandalone }

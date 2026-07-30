@@ -37,7 +37,8 @@ enum RentalMode {
 }
 
 enum DriverStatus {
-  ACTIVE
+  IDLE
+  ASSIGNED
   INACTIVE
 }
 
@@ -92,13 +93,16 @@ model Outlet {
 }
 
 model Driver {
-  id        Int          @id @default(autoincrement())
-  fullName  String
-  phone     String
-  status    DriverStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
+  id            Int          @id @default(autoincrement())
+  fullName      String
+  cnic          String       @unique
+  licenseNumber String       @unique
+  licenseExpiry DateTime
+  phone         String
+  status        DriverStatus @default(IDLE)
+  createdAt     DateTime     @default(now())
 
-  bookings  Booking[]
+  bookings      Booking[]
 }
 
 model Booking {

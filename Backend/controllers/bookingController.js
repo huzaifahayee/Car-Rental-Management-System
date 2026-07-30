@@ -1,6 +1,5 @@
 const crypto = require('crypto')
 const { geocodeAddress, validateCoordinates } = require('../utils/geocoding')
-const { isDriverAvailable } = require('../utils/driverAvailability')
 
 function generateBookingReference() {
   return `GT-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
@@ -31,6 +30,7 @@ async function reconcileOverdueBookings(prisma) {
     select: {
       id: true,
       vehiclePackageId: true,
+      driverId: true,
     },
   })
 
@@ -38,6 +38,7 @@ async function reconcileOverdueBookings(prisma) {
 
   const bookingIds = overdueConfirmedBookings.map((booking) => booking.id)
   const vehicleIds = [...new Set(overdueConfirmedBookings.map((booking) => booking.vehiclePackageId))]
+  const driverIds = [...new Set(overdueConfirmedBookings.map((booking) => booking.driverId).filter(Boolean))]
 
   await prisma.$transaction([
     prisma.booking.updateMany({
@@ -48,6 +49,10 @@ async function reconcileOverdueBookings(prisma) {
       where: { id: { in: vehicleIds } },
       data: { status: 'AVAILABLE' },
     }),
+    ...(driverIds.length ? [prisma.driver.updateMany({
+      where: { id: { in: driverIds } },
+      data: { status: 'IDLE' },
+    })] : []),
   ])
 }
 
@@ -221,6 +226,8 @@ async function updateBookingStatus(req, res) {
     if (!booking) return res.status(404).json({ error: 'Booking not found.' })
 
     const vehicleStatus = getVehicleStatusForBookingStatus(status, booking)
+    const releaseDriver = ['CANCELLED', 'COMPLETED'].includes(status) && booking.driverId
+
     const [updatedBooking] = await req.prisma.$transaction([
       req.prisma.booking.update({
         where: { id: Number(req.params.id) },
@@ -236,6 +243,7 @@ async function updateBookingStatus(req, res) {
         where: { id: booking.vehiclePackageId },
         data: { status: vehicleStatus },
       }),
+      ...(releaseDriver ? [req.prisma.driver.update({ where: { id: booking.driverId }, data: { status: 'IDLE' } })] : []),
     ])
 
     res.json(updatedBooking)
@@ -276,6 +284,7 @@ async function cancelBooking(req, res) {
         where: { id: booking.vehiclePackageId },
         data: { status: vehicleStatus },
       }),
+      ...(booking.driverId ? [req.prisma.driver.update({ where: { id: booking.driverId }, data: { status: 'IDLE' } })] : []),
     ])
 
     res.json(updated)
@@ -305,18 +314,20 @@ async function assignDriver(req, res) {
 
     const driver = await req.prisma.driver.findUnique({ where: { id: Number(driverId) } })
     if (!driver) return res.status(404).json({ error: 'Driver not found.' })
-    if (driver.status !== 'ACTIVE') {
-      return res.status(409).json({ error: 'This driver is not active.' })
+    if (driver.status !== 'IDLE') {
+      return res.status(409).json({ error: 'This driver is not currently available.' })
     }
 
-    // Real overlap check — excludes this booking itself so re-confirming the
-    // same driver on the same booking doesn't false-positive against itself.
-    const available = await isDriverAvailable(req.prisma, driver.id, booking.pickupDateTime, booking.returnDateTime, booking.id)
-    if (!available) {
-      return res.status(409).json({ error: 'This driver is already assigned to an overlapping booking.' })
-    }
+    // Freeing up a previously-assigned driver on this booking (reassignment)
+    // so they don't stay stuck as ASSIGNED once replaced.
+    const previousDriverId = booking.driverId
 
-    const updated = await req.prisma.booking.update({
+    const ops = []
+    if (previousDriverId) {
+      ops.push(req.prisma.driver.update({ where: { id: previousDriverId }, data: { status: 'IDLE' } }))
+    }
+    ops.push(req.prisma.driver.update({ where: { id: driver.id }, data: { status: 'ASSIGNED' } }))
+    ops.push(req.prisma.booking.update({
       where: { id },
       data: { driverId: driver.id },
       include: {
@@ -325,8 +336,10 @@ async function assignDriver(req, res) {
         outlet: true,
         driver: true,
       },
-    })
-    res.json(updated)
+    }))
+
+    const results = await req.prisma.$transaction(ops)
+    res.json(results[results.length - 1])
   } catch (err) {
     res.status(500).json({ error: 'Failed to assign driver', details: err.message })
   }

@@ -74,19 +74,19 @@ export default function SearchResults() {
   return (
     <div style={{ background: '#f5f7fa', minHeight: '100vh' }}>
       {/* Top Banner */}
-      <div style={{ background: '#1a1a2e', color: '#ccd6df', fontSize: 13, padding: '14px 0' }}>
-        <div className="max-w-7xl mx-auto px-6 flex flex-wrap justify-between items-center gap-4">
+      <div style={{ background: 'var(--brand)', color: 'rgba(255,255,255,0.85)', fontSize: 13, padding: '14px 0' }}>
+        <div className="max-w-[1600px] mx-auto px-6 flex flex-wrap justify-between items-center gap-4">
           <div>
             <strong style={{ color: '#fff', fontSize: 15 }}>Find your perfect rental</strong>
-            <span style={{ marginLeft: 10, color: 'var(--brand)' }}>Live availability</span>
+            <span style={{ marginLeft: 10, color: '#fff' }}>Live availability</span>
           </div>
-          
+
           {rentalMode && (
-            <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-xl">
-<span style={{ background: 'var(--brand)', color: 'var(--surface)', fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 20 }}>
+            <div className="flex items-center gap-3 bg-white/15 px-4 py-2 rounded-xl">
+<span style={{ background: '#1a1a2e', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 10px', borderRadius: 20 }}>
                 {rentalMode === 'WITH_DRIVER' ? 'WITH DRIVER' : 'SELF DRIVE'}
               </span>
-              
+
               {rentalMode === 'WITH_DRIVER' && pickupAddress && (
                 <span style={{ color: '#fff', fontSize: 13 }}>
                   📍 {pickupAddress}
@@ -103,7 +103,7 @@ export default function SearchResults() {
                       href={`https://www.google.com/maps/dir/?api=1&destination=${selectedOutlet.latitude},${selectedOutlet.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      style={{ color: 'var(--brand)', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}
+                      style={{ color: '#fff', fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}
                     >
                       Get Directions ↗
                     </a>
@@ -115,9 +115,9 @@ export default function SearchResults() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-[1600px] mx-auto px-6 py-8">
         <div className="search-layout flex gap-6" style={{ alignItems: 'flex-start' }}>
-          <aside style={{ width: 240, flexShrink: 0, background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.06)', position: 'sticky', top: 80 }}>
+          <aside style={{ width: 320, flexShrink: 0, marginLeft: -20, background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 2px 12px rgba(0,0,0,.06)', position: 'sticky', top: 80 }}>
             <h2 style={{ fontWeight: 800, fontSize: 15, color: '#1a1a2e', marginBottom: 20 }}>Filters</h2>
             <p style={filterLabel}>Options</p>
             <FilterToggle label="With Driver" value={withDriverOnly} onChange={setWithDriverOnly} />
@@ -131,9 +131,9 @@ export default function SearchResults() {
                   display: 'block', width: '100%', textAlign: 'left',
                   padding: '9px 12px', borderRadius: 8, marginBottom: 4,
                   border: 'none', cursor: 'pointer', fontSize: 14,
-                  fontWeight: activeCategory === category ? 700 : 500,
+                  fontWeight: activeCategory === category ? 800 : 700,
                   background: activeCategory === category ? 'rgba(var(--brand-2-rgb), 0.12)' : 'transparent',
-                  color: activeCategory === category ? 'var(--brand-2)' : '#555',
+                  color: activeCategory === category ? 'var(--brand-2)' : '#333',
                 }}
               >
                 {category === 'all' ? 'All Vehicles' : formatCategory(category)}
@@ -180,7 +180,7 @@ const filterLabel = { fontSize: 12, fontWeight: 700, color: '#888', textTransfor
 
 function FilterToggle({ label, value, onChange }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12, cursor: 'pointer', fontSize: 14, color: '#444' }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12, cursor: 'pointer', fontSize: 14, fontWeight: 700, color: '#333' }}>
       <input type="checkbox" checked={value} onChange={e => onChange(e.target.checked)} accentColor="var(--brand)" />
       {label}
     </label>

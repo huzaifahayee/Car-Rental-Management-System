@@ -8,11 +8,13 @@ const {
   updateVehicle,
   deleteVehicle,
    uploadVehicleImages,
+  uploadVehicleImageStandalone,
 } = require('../controllers/vehicleController')
 
 const router = express.Router()
 
 router.get('/', getVehicles)
+router.post('/images/upload', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), upload.single('image'), uploadVehicleImageStandalone)
 router.get('/:id', getVehicleById)
 router.post('/', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), createVehicle)
 router.put('/:id', authenticate, authorize('SUPERADMIN', 'ADMIN', 'EMPLOYEE'), updateVehicle)

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import { isValidEmail, phoneError, passwordError, cnicError, formatCnic } from '../lib/validation'
+import AuthAvatar from '../components/AuthAvatar'
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
@@ -89,9 +90,7 @@ export default function Register() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <div style={{ background: 'var(--brand)', borderRadius: 12, width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <span style={{ color: '#fff', fontWeight: 900, fontSize: 24 }}>G</span>
-            </div>
+            <AuthAvatar />
             <h1 style={{ fontWeight: 800, fontSize: 24, color: '#1a1a2e', marginBottom: 6 }}>Create an account</h1>
             <p style={{ color: '#888', fontSize: 14 }}>Sign up to start booking</p>
           </div>

@@ -13,7 +13,20 @@ const publicRoutes = require('./routes/public')
 const cors = require("cors")
 
 const app = express()
-app.use(cors({ origin: 'http://localhost:5173' }))
+
+// Allow the frontend dev origin plus any `<tenant-slug>.localhost:5173`
+// subdomain, so per-tenant frontends can reach this shared backend.
+// TODO: broaden/config-drive this pattern for production tenant domains.
+const ALLOWED_ORIGIN_PATTERN = /^https?:\/\/([a-z0-9-]+\.)?localhost:5173$/i
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || ALLOWED_ORIGIN_PATTERN.test(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('Not allowed by CORS'))
+    }
+  },
+}))
 app.use(express.json())
 app.use(tenantResolver)
 

@@ -7,7 +7,7 @@ import LocationAutocomplete from '../components/LocationAutocomplete'
 import IOSDropdown from '../components/IOSDropdown'
 import ThemeEditor from '../components/ThemeEditor'
 import AgencySettingsEditor from '../components/AgencySettingsEditor'
-import { formatCnic, formatPhone } from '../lib/validation'
+import { formatCnic, formatPhone, fullNameError, phoneError, cnicError, licenseNumberError, licenseExpiryError, formatLicenseNumber, registrationPlateError, formatRegistrationPlate } from '../lib/validation'
 
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
 
@@ -21,10 +21,22 @@ const STATUS_COLORS = {
   MAINTENANCE: ['#ffedd5', '#c2410c'],
   INACTIVE: ['#f3f4f6', '#6b7280'],
   ACTIVE: ['#dcfce7', '#16a34a'],
+  IDLE: ['#dcfce7', '#16a34a'],
+  ASSIGNED: ['#dbeafe', '#1d4ed8'],
   SUPERADMIN: ['#fae8ff', '#86198f'],
   ADMIN: ['#e0e7ff', '#3730a3'],
   EMPLOYEE: ['#e0f2fe', '#0369a1'],
   CUSTOMER: ['#f3f4f6', '#4b5563'],
+}
+
+function validateDriverForm({ fullName, phone, cnic, licenseNumber, licenseExpiry }) {
+  return {
+    fullName: fullNameError(fullName),
+    phone: phoneError(phone),
+    cnic: cnicError(cnic),
+    licenseNumber: licenseNumberError(licenseNumber),
+    licenseExpiry: licenseExpiryError(licenseExpiry),
+  }
 }
 
 const label = value => String(value).replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase())
@@ -150,14 +162,16 @@ export default function AdminPanel() {
     imageUrl: '', status: 'AVAILABLE',
   })
   const [vehicleFormError, setVehicleFormError] = useState('')
+  const [vehicleFieldErrors, setVehicleFieldErrors] = useState({})
   const [vehicleSubmitting, setVehicleSubmitting] = useState(false)
   const [selectedFile, setSelectedFile] = useState(null)
 
   // Modal State for Drivers
   const [showDriverModal, setShowDriverModal] = useState(false)
   const [editingDriver, setEditingDriver] = useState(null)
-  const [driverForm, setDriverForm] = useState({ fullName: '', phone: '', status: 'ACTIVE' })
+  const [driverForm, setDriverForm] = useState({ fullName: '', phone: '', cnic: '', licenseNumber: '', licenseExpiry: '', status: 'IDLE' })
   const [driverFormError, setDriverFormError] = useState('')
+  const [driverFieldErrors, setDriverFieldErrors] = useState({})
   const [driverSubmitting, setDriverSubmitting] = useState(false)
 
   // Reusable confirmation and error modal states
@@ -405,6 +419,25 @@ export default function AdminPanel() {
     handleUpdateBookingStatus(booking.id, 'CONFIRMED')
   }
 
+  function handleApproveClick(booking) {
+    if (booking.rentalMode === 'WITH_DRIVER') {
+      setApproveDriverModal(booking)
+    } else {
+      handleApproveBooking(booking)
+    }
+  }
+
+  async function handleApproveWithDriver(booking, driverId) {
+    if (driverId) {
+      await apiFetch(`/bookings/${booking.id}/assign-driver`, {
+        method: 'PUT',
+        body: JSON.stringify({ driverId }),
+      })
+    }
+    handleApproveBooking(booking)
+    setApproveDriverModal(null)
+  }
+
   async function handleBookingStatusChange(booking, newStatus) {
     if (booking.status === 'PENDING' && newStatus === 'CONFIRMED') {
       handleApproveBooking(booking)
@@ -429,6 +462,9 @@ export default function AdminPanel() {
 
   // ---- View booking details (full customer + ride info before approving) ----
   const [viewBookingModal, setViewBookingModal] = useState(null)
+
+  // ---- Approve With-Driver booking (pick an idle driver as part of approval) ----
+  const [approveDriverModal, setApproveDriverModal] = useState(null)
 
   // ---- Cancel Booking (with confirmation modal) ----
   const [cancelBookingModal, setCancelBookingModal] = useState({ show: false, bookingId: null, bookingNumId: null, bookingRef: '', customerName: '', customerPhone: '', vehicleName: '' })
@@ -534,6 +570,7 @@ export default function AdminPanel() {
     })
     setSelectedFile(null)
     setVehicleFormError('')
+    setVehicleFieldErrors({})
     setShowVehicleModal(true)
   }
 
@@ -558,6 +595,7 @@ export default function AdminPanel() {
     })
     setSelectedFile(null)
     setVehicleFormError('')
+    setVehicleFieldErrors({})
     setShowVehicleModal(true)
   }
 
@@ -587,60 +625,57 @@ export default function AdminPanel() {
       return
     }
 
-    const imageUrlsPayload = imageUrl.trim() ? [imageUrl.trim()] : []
+    const plateErr = registrationPlateError(registrationPlate)
+    const imageErr = (!selectedFile && !imageUrl.trim()) ? 'Provide either an uploaded image file or an image URL.' : ''
+    if (plateErr || imageErr) {
+      setVehicleFieldErrors({ registrationPlate: plateErr, image: imageErr })
+      return
+    }
+    setVehicleFieldErrors({})
 
     setVehicleSubmitting(true)
     try {
-      let savedVehicle
-      if (editingVehicle) {
-        savedVehicle = await apiFetch(`/vehicles/${editingVehicle.id}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            category: category.trim(),
-            make: make.trim(),
-            model: model.trim(),
-            variant: variant.trim() || null,
-            year: yearNum,
-            registrationPlate: registrationPlate.trim() || null,
-            seatingCapacity: seatsNum,
-            transmission,
-            hasAC,
-            driverOption,
-            pricePerDay: priceNum,
-            pickupCity: pickupCity.trim(),
-            dropoffCity: dropoffCity.trim(),
-            imageUrls: imageUrlsPayload,
-            status,
-          }),
-        })
-      } else {
-        savedVehicle = await apiFetch('/vehicles', {
-          method: 'POST',
-          body: JSON.stringify({
-            category: category.trim(),
-            make: make.trim(),
-            model: model.trim(),
-            variant: variant.trim() || null,
-            year: yearNum,
-            registrationPlate: registrationPlate.trim() || null,
-            seatingCapacity: seatsNum,
-            transmission,
-            hasAC,
-            driverOption,
-            pricePerDay: priceNum,
-            pickupCity: pickupCity.trim(),
-            dropoffCity: dropoffCity.trim(),
-            imageUrls: imageUrlsPayload,
-          }),
-        })
-      }
-
-      if (selectedFile && savedVehicle?.id) {
+      // Upload the file first (if any) so the resulting URL can go into the
+      // same create/update request — the backend requires imageUrls
+      // non-empty in that one request rather than trusting a follow-up call.
+      let finalImageUrl = imageUrl.trim()
+      if (selectedFile) {
         const formData = new FormData()
-        formData.append('images', selectedFile)
-        await apiFetch(`/vehicles/${savedVehicle.id}/images`, {
+        formData.append('image', selectedFile)
+        const uploaded = await apiFetch('/vehicles/images/upload', {
           method: 'POST',
           body: formData,
+        })
+        finalImageUrl = uploaded.url
+      }
+      const imageUrlsPayload = finalImageUrl ? [finalImageUrl] : []
+
+      const payload = {
+        category: category.trim(),
+        make: make.trim(),
+        model: model.trim(),
+        variant: variant.trim() || null,
+        year: yearNum,
+        registrationPlate: registrationPlate.trim().toUpperCase(),
+        seatingCapacity: seatsNum,
+        transmission,
+        hasAC,
+        driverOption,
+        pricePerDay: priceNum,
+        pickupCity: pickupCity.trim(),
+        dropoffCity: dropoffCity.trim(),
+        imageUrls: imageUrlsPayload,
+      }
+
+      if (editingVehicle) {
+        await apiFetch(`/vehicles/${editingVehicle.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ ...payload, status }),
+        })
+      } else {
+        await apiFetch('/vehicles', {
+          method: 'POST',
+          body: JSON.stringify(payload),
         })
       }
 
@@ -669,26 +704,50 @@ export default function AdminPanel() {
   // Driver Modal actions
   function openCreateDriverModal() {
     setEditingDriver(null)
-    setDriverForm({ fullName: '', phone: '', status: 'ACTIVE' })
+    setDriverForm({ fullName: '', phone: '', cnic: '', licenseNumber: '', licenseExpiry: '', status: 'IDLE' })
     setDriverFormError('')
+    setDriverFieldErrors({})
     setShowDriverModal(true)
   }
 
   function openEditDriverModal(driver) {
     setEditingDriver(driver)
-    setDriverForm({ fullName: driver.fullName, phone: driver.phone, status: driver.status })
+    setDriverForm({
+      fullName: driver.fullName,
+      phone: driver.phone,
+      cnic: driver.cnic,
+      licenseNumber: driver.licenseNumber,
+      licenseExpiry: driver.licenseExpiry ? driver.licenseExpiry.slice(0, 10) : '',
+      status: driver.status,
+    })
     setDriverFormError('')
+    setDriverFieldErrors({})
     setShowDriverModal(true)
+  }
+
+  function updateDriverField(field, value) {
+    const nextForm = { ...driverForm, [field]: value }
+    setDriverForm(nextForm)
+    setDriverFieldErrors({ ...driverFieldErrors, [field]: validateDriverForm(nextForm)[field] })
   }
 
   async function handleSaveDriver(e) {
     e.preventDefault()
     setDriverFormError('')
 
-    const { fullName, phone, status } = driverForm
-    if (!fullName.trim() || !phone.trim()) {
-      setDriverFormError('Full name and phone number are required.')
+    const fieldErrors = validateDriverForm(driverForm)
+    setDriverFieldErrors(fieldErrors)
+    if (Object.values(fieldErrors).some(Boolean)) {
       return
+    }
+
+    const { fullName, phone, cnic, licenseNumber, licenseExpiry, status } = driverForm
+    const payload = {
+      fullName: fullName.trim(),
+      phone: phone.trim(),
+      cnic: cnic.trim(),
+      licenseNumber: licenseNumber.trim(),
+      licenseExpiry,
     }
 
     setDriverSubmitting(true)
@@ -696,12 +755,12 @@ export default function AdminPanel() {
       if (editingDriver) {
         await apiFetch(`/drivers/${editingDriver.id}`, {
           method: 'PUT',
-          body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim(), status }),
+          body: JSON.stringify({ ...payload, status }),
         })
       } else {
         await apiFetch('/drivers', {
           method: 'POST',
-          body: JSON.stringify({ fullName: fullName.trim(), phone: phone.trim() }),
+          body: JSON.stringify(payload),
         })
       }
       setShowDriverModal(false)
@@ -734,19 +793,19 @@ export default function AdminPanel() {
   return (
     <div style={{ background: '#f5f7fa', minHeight: '100vh' }}>
      <header style={{
-        background: 'linear-gradient(120deg, #003d24 0%, #00693b 100%)',
+        background: 'var(--brand)',
         padding: '14px 0',
       }}>
         <div className="w-full px-4 md:px-6 lg:px-8 flex items-center justify-between">
           <div>
-            <h1 style={{ color: '#fff', fontSize: 18, margin: 0 }}>Admin Panel</h1>
-            <p style={{ color: '#9ca3af', fontSize: 12, margin: '3px 0 0' }}>Live rental operations</p>
+            <h1 style={{ color: '#fff', fontSize: 18, fontWeight: 900, letterSpacing: -0.3, margin: 0 }}>Admin Panel</h1>
+            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12, fontWeight: 700, margin: '3px 0 0' }}>Live rental operations</p>
           </div>
           <div className="flex items-center gap-3">
-            <span style={{ color: 'var(--brand)', fontSize: 11, fontWeight: 800, background: 'rgba(var(--brand-rgb), 0.15)', padding: '4px 10px', borderRadius: 20 }}>
+            <span style={{ color: '#fff', fontSize: 11, fontWeight: 900, letterSpacing: 0.3, background: 'rgba(255,255,255,0.22)', padding: '4px 10px', borderRadius: 20 }}>
               {user.role}
             </span>
-            <div style={{ color: 'var(--surface)', fontSize: 13, fontWeight: 700 }}>{user.fullName}</div>
+            <div style={{ color: 'var(--surface)', fontSize: 13, fontWeight: 900 }}>{user.fullName}</div>
           </div>
         </div>
       </header>
@@ -813,7 +872,7 @@ export default function AdminPanel() {
               </DataCard>
             )}
 
-            {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
+            {tab === 'bookings' && <DataCard title={`All bookings (${bookings.length})`}><BookingsTable bookings={bookings} currentUser={user} onStatusChange={handleBookingStatusChange} onApprove={handleApproveClick} onCancelBooking={handleCancelBookingInitiate} onDeleteBooking={handleDeleteBookingInitiate} onViewDetails={setViewBookingModal} /></DataCard>}
             
             {tab === 'vehicles' && (
               <DataCard
@@ -1295,7 +1354,16 @@ export default function AdminPanel() {
                 </div>
                 <div>
                   <label style={modalLabel}>Registration Plate</label>
-                  <input type="text" value={vehicleForm.registrationPlate} onChange={e => setVehicleForm({ ...vehicleForm, registrationPlate: e.target.value })} placeholder="e.g. LEA-1234" style={modalInput} />
+                  <input
+                    type="text"
+                    value={vehicleForm.registrationPlate}
+                    onChange={e => setVehicleForm({ ...vehicleForm, registrationPlate: formatRegistrationPlate(e.target.value) })}
+                    placeholder="e.g. ABC-1234"
+                    maxLength={8}
+                    required
+                    style={{ ...modalInput, borderColor: vehicleFieldErrors.registrationPlate ? '#dc2626' : '#d8e0e5' }}
+                  />
+                  {vehicleFieldErrors.registrationPlate && <p className="field-error">{vehicleFieldErrors.registrationPlate}</p>}
                 </div>
               </div>
 
@@ -1363,7 +1431,7 @@ export default function AdminPanel() {
                     type="file"
                     accept="image/*"
                     onChange={e => setSelectedFile(e.target.files[0])}
-                    style={{ ...modalInput, padding: '8px 10px' }}
+                    style={{ ...modalInput, padding: '8px 10px', borderColor: vehicleFieldErrors.image ? '#dc2626' : '#d8e0e5' }}
                   />
                 </div>
                 <div>
@@ -1373,10 +1441,11 @@ export default function AdminPanel() {
                     value={vehicleForm.imageUrl}
                     onChange={e => setVehicleForm({ ...vehicleForm, imageUrl: e.target.value })}
                     placeholder="https://images.unsplash.com/... or image link"
-                    style={modalInput}
+                    style={{ ...modalInput, borderColor: vehicleFieldErrors.image ? '#dc2626' : '#d8e0e5' }}
                   />
                 </div>
               </div>
+              {vehicleFieldErrors.image && <p className="field-error">{vehicleFieldErrors.image}</p>}
 
               {(selectedFile || vehicleForm.imageUrl) && (
                 <div style={{ marginTop: 6 }}>
@@ -1506,12 +1575,70 @@ export default function AdminPanel() {
             <form onSubmit={handleSaveDriver} style={{ display: 'grid', gap: 14 }}>
               <div>
                 <label style={modalLabel}>Full Name</label>
-                <input type="text" value={driverForm.fullName} onChange={e => setDriverForm({ ...driverForm, fullName: e.target.value })} placeholder="e.g. Ahmed Khan" required style={modalInput} />
+                <input
+                  type="text"
+                  value={driverForm.fullName}
+                  onChange={e => updateDriverField('fullName', e.target.value)}
+                  placeholder="e.g. Ahmed Khan"
+                  required
+                  style={{ ...modalInput, borderColor: driverFieldErrors.fullName ? '#dc2626' : '#d8e0e5' }}
+                />
+                {driverFieldErrors.fullName && <p className="field-error">{driverFieldErrors.fullName}</p>}
               </div>
 
               <div>
                 <label style={modalLabel}>Phone Number</label>
-                <input type="tel" value={driverForm.phone} onChange={e => setDriverForm({ ...driverForm, phone: e.target.value })} placeholder="03001234567" required style={modalInput} />
+                <input
+                  type="tel"
+                  value={driverForm.phone}
+                  onChange={e => updateDriverField('phone', e.target.value)}
+                  placeholder="03001234567"
+                  required
+                  style={{ ...modalInput, borderColor: driverFieldErrors.phone ? '#dc2626' : '#d8e0e5' }}
+                />
+                {driverFieldErrors.phone && <p className="field-error">{driverFieldErrors.phone}</p>}
+              </div>
+
+              <div>
+                <label style={modalLabel}>CNIC</label>
+                <input
+                  type="text"
+                  value={driverForm.cnic}
+                  onChange={e => updateDriverField('cnic', formatCnic(e.target.value))}
+                  placeholder="12345-1234567-1"
+                  inputMode="numeric"
+                  maxLength={15}
+                  required
+                  style={{ ...modalInput, borderColor: driverFieldErrors.cnic ? '#dc2626' : '#d8e0e5' }}
+                />
+                {driverFieldErrors.cnic && <p className="field-error">{driverFieldErrors.cnic}</p>}
+              </div>
+
+              <div>
+                <label style={modalLabel}>License Number</label>
+                <input
+                  type="text"
+                  value={driverForm.licenseNumber}
+                  onChange={e => updateDriverField('licenseNumber', formatLicenseNumber(e.target.value))}
+                  placeholder="e.g. LHR-2024-123456"
+                  inputMode="text"
+                  maxLength={16}
+                  required
+                  style={{ ...modalInput, borderColor: driverFieldErrors.licenseNumber ? '#dc2626' : '#d8e0e5' }}
+                />
+                {driverFieldErrors.licenseNumber && <p className="field-error">{driverFieldErrors.licenseNumber}</p>}
+              </div>
+
+              <div>
+                <label style={modalLabel}>License Expiry</label>
+                <input
+                  type="date"
+                  value={driverForm.licenseExpiry}
+                  onChange={e => updateDriverField('licenseExpiry', e.target.value)}
+                  required
+                  style={{ ...modalInput, borderColor: driverFieldErrors.licenseExpiry ? '#dc2626' : '#d8e0e5' }}
+                />
+                {driverFieldErrors.licenseExpiry && <p className="field-error">{driverFieldErrors.licenseExpiry}</p>}
               </div>
 
               {editingDriver && (
@@ -1521,7 +1648,7 @@ export default function AdminPanel() {
                     value={driverForm.status}
                     onChange={e => setDriverForm({ ...driverForm, status: e.target.value })}
                     label="Status"
-                    options={['ACTIVE', 'INACTIVE']}
+                    options={['IDLE', 'ASSIGNED', 'INACTIVE']}
                   />
                 </div>
               )}
@@ -1616,6 +1743,15 @@ export default function AdminPanel() {
           }}
         />
       )}
+
+      {/* Approve With-Driver Modal — pick an idle driver as part of approving */}
+      {approveDriverModal && (
+        <ApproveWithDriverModal
+          booking={approveDriverModal}
+          onClose={() => setApproveDriverModal(null)}
+          onConfirm={handleApproveWithDriver}
+        />
+      )}
     </div>
   )
 }
@@ -1650,16 +1786,18 @@ function DataCard({ title, action, children }) {
   )
 }
 
-function Badge({ value }) {
+const DRIVER_STATUS_LABELS = { IDLE: 'Available', ASSIGNED: 'Assigned', INACTIVE: 'Inactive' }
+
+function Badge({ value, labels }) {
   const [background, color] = STATUS_COLORS[value] || ['#f3f4f6', '#555']
   return (
     <span style={{ background, color, fontSize: 11, fontWeight: 800, padding: '4px 9px', borderRadius: 20, whiteSpace: 'nowrap' }}>
-      {label(value)}
+      {labels?.[value] || label(value)}
     </span>
   )
 }
 
-function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking, onDeleteBooking, onViewDetails }) {
+function BookingsTable({ bookings, currentUser, onStatusChange, onApprove, onCancelBooking, onDeleteBooking, onViewDetails }) {
   const canManage = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE'].includes(currentUser?.role)
 
   return (
@@ -1713,7 +1851,7 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
                       </button>
                       {booking.status === 'PENDING' && (
                         <button
-                          onClick={() => onStatusChange(booking, 'CONFIRMED')}
+                          onClick={() => onApprove(booking)}
                           style={{
                             background: 'var(--brand)',
                             color: '#fff',
@@ -1814,6 +1952,92 @@ function BookingsTable({ bookings, currentUser, onStatusChange, onCancelBooking,
   )
 }
 
+function ApproveWithDriverModal({ booking, onClose, onConfirm }) {
+  const alreadyAssigned = !!booking.driverId
+  const [drivers, setDrivers] = useState([])
+  const [loading, setLoading] = useState(!alreadyAssigned)
+  const [selectedDriverId, setSelectedDriverId] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (alreadyAssigned) return
+    apiFetch('/drivers?status=IDLE')
+      .then(list => {
+        setDrivers(list)
+        if (list.length > 0) setSelectedDriverId(String(list[0].id))
+      })
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function handleConfirm() {
+    setSubmitting(true)
+    setError('')
+    try {
+      await onConfirm(booking, alreadyAssigned ? null : Number(selectedDriverId))
+    } catch (err) {
+      setError(err.message)
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div style={modalOverlayStyle}>
+      <div style={modalCardStyle}>
+        <div className="flex justify-between items-center mb-4">
+          <h2 style={{ margin: 0, fontSize: 18, color: '#1a1a2e' }}>Approve With-Driver Booking</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#888' }}>×</button>
+        </div>
+
+        <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 16px' }}>
+          Booking <strong style={{ color: 'var(--brand-2)' }}>{booking.bookingReference}</strong> is a With-Driver booking and needs a driver assigned as part of approval.
+        </p>
+
+        {loading ? (
+          <p style={{ color: '#888', fontSize: 14 }}>Checking idle drivers…</p>
+        ) : alreadyAssigned ? (
+          <p style={{ fontSize: 14, color: '#444', margin: '0 0 16px' }}>
+            Driver <strong>{booking.driver?.fullName}</strong> is already assigned to this booking. Approve now?
+          </p>
+        ) : drivers.length === 0 ? (
+          <p style={{ color: '#dc2626', fontSize: 13, fontWeight: 600, background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', margin: '0 0 4px' }}>
+            No driver is currently available (Idle). This booking can't be approved until a driver becomes available.
+          </p>
+        ) : (
+          <div style={{ marginBottom: 16 }}>
+            <label style={modalLabel}>Assign Idle Driver</label>
+            <IOSDropdown
+              value={selectedDriverId}
+              onChange={e => setSelectedDriverId(e.target.value)}
+              label="Driver"
+              options={drivers.map(d => ({ value: String(d.id), label: `${d.fullName} (${formatPhone(d.phone)})` }))}
+            />
+          </div>
+        )}
+
+        {error && <p style={{ color: '#c53030', fontSize: 13, margin: '0 0 4px' }}>{error}</p>}
+
+        <div className="flex justify-end gap-3 mt-3">
+          <button type="button" onClick={onClose} style={{ background: '#f3f4f6', color: '#444', border: 'none', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}>
+            Cancel
+          </button>
+          {!loading && (alreadyAssigned || drivers.length > 0) && (
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={submitting || (!alreadyAssigned && !selectedDriverId)}
+              style={{ background: 'var(--brand)', color: 'var(--surface)', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 700, cursor: 'pointer', opacity: submitting ? 0.7 : 1 }}
+            >
+              {submitting ? 'Approving...' : 'Approve & Assign'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function DetailRow({ label: rowLabel, value }) {
   if (value === null || value === undefined || value === '') return null
   return (
@@ -1853,13 +2077,7 @@ function BookingDetailsModal({ booking, currentUser, onClose, onAssigned }) {
   useEffect(() => {
     setCurrentDriver(booking.driver || null)
     if (!canAssignDriver) return
-    const params = new URLSearchParams({
-      available: 'true',
-      pickupDateTime: booking.pickupDateTime,
-      returnDateTime: booking.returnDateTime,
-      excludeBookingId: String(booking.id),
-    })
-    apiFetch(`/drivers?${params.toString()}`)
+    apiFetch('/drivers?status=IDLE')
       .then(setAvailableDrivers)
       .catch(() => setAvailableDrivers([]))
   }, [booking.id])
@@ -2187,7 +2405,7 @@ function DriversTable({ drivers, currentUser, onEdit, onDelete }) {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
         <thead>
           <tr>
-            {['Name', 'Phone', 'Status', 'Registered', 'Actions'].map(heading => (
+            {['Name', 'Phone', 'CNIC', 'License', 'License Expiry', 'Status', 'Registered', 'Actions'].map(heading => (
               <th key={heading} style={th}>{heading}</th>
             ))}
           </tr>
@@ -2197,7 +2415,10 @@ function DriversTable({ drivers, currentUser, onEdit, onDelete }) {
             <tr key={driver.id} style={{ borderTop: '1px solid #f1f3f5' }}>
               <td style={td}><strong>{driver.fullName}</strong></td>
               <td style={td}>{formatPhone(driver.phone)}</td>
-              <td style={td}><Badge value={driver.status} /></td>
+              <td style={td}>{driver.cnic}</td>
+              <td style={td}>{driver.licenseNumber}</td>
+              <td style={td}>{driver.licenseExpiry ? date(driver.licenseExpiry) : '—'}</td>
+              <td style={td}><Badge value={driver.status} labels={DRIVER_STATUS_LABELS} /></td>
               <td style={td}>{date(driver.createdAt)}</td>
               <td style={td}>
                 <div className="flex gap-2">
@@ -2209,7 +2430,7 @@ function DriversTable({ drivers, currentUser, onEdit, onDelete }) {
               </td>
             </tr>
           )) : (
-            <tr><td colSpan="5" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No drivers added yet. Click "+ Add Driver" to create one.</td></tr>
+            <tr><td colSpan="8" style={{ ...td, textAlign: 'center', color: '#8b95a1' }}>No drivers added yet. Click "+ Add Driver" to create one.</td></tr>
           )}
         </tbody>
       </table>

@@ -58,6 +58,56 @@ export function formatPhone(value) {
   return value
 }
 
+export function fullNameError(value) {
+  if (!value || !value.trim()) return 'Full name is required.'
+  const trimmed = value.trim().replace(/\s+/g, ' ')
+  if (trimmed.length < 2 || trimmed.length > 100 || !/^[\p{L}][\p{L}\s.'-]*$/u.test(trimmed)) {
+    return 'Full name must be 2-100 characters and use letters, spaces, apostrophes, or hyphens only.'
+  }
+  return ''
+}
+
+export function licenseNumberError(value) {
+  if (!value || !value.trim()) return 'License number is required.'
+  if (!/^[A-Za-z]{3}-\d{4}-\d{4,7}$/.test(value.trim())) {
+    return 'Enter a valid license number in the format LHR-2024-123456 (city code-year-sequence).'
+  }
+  return ''
+}
+
+// Formats raw input into the conventional city-year-sequence license display,
+// e.g. LHR-2024-123456 — 3 letters, then 4-digit year, then up to 7 digits.
+export function formatLicenseNumber(value) {
+  const raw = value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const part1 = raw.slice(0, 3).replace(/[^A-Z]/g, '')
+  const rest = raw.slice(part1.length).replace(/[^0-9]/g, '')
+  const part2 = rest.slice(0, 4)
+  const part3 = rest.slice(4, 11)
+  return [part1, part2, part3].filter(Boolean).join('-')
+}
+
+export function licenseExpiryError(value) {
+  if (!value || isNaN(new Date(value).getTime())) return 'A valid license expiry date is required.'
+  return ''
+}
+
+// Registration plate: 3 letters, then 4 digits, displayed/stored as ABC-1234
+// (matches the hyphenated format already used elsewhere in this codebase).
+export function registrationPlateError(value) {
+  if (!value || !value.trim()) return 'Registration plate is required.'
+  if (!/^[A-Z]{3}-\d{4}$/.test(value.trim())) {
+    return 'Plate must be 3 letters followed by 4 digits, e.g. ABC-1234.'
+  }
+  return ''
+}
+
+export function formatRegistrationPlate(value) {
+  const raw = value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  const letters = raw.slice(0, 3).replace(/[^A-Z]/g, '')
+  const digits = raw.slice(letters.length).replace(/[^0-9]/g, '').slice(0, 4)
+  return [letters, digits].filter(Boolean).join('-')
+}
+
 export function passwordError(value) {
   if (value.length < 8) return 'Password must be at least 8 characters long.'
   if (value.length > 72) return 'Password must be 72 characters or fewer.'

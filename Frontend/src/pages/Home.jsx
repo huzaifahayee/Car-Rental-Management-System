@@ -96,6 +96,24 @@ export default function Home() {
 
   const [fieldErrors, setFieldErrors] = useState({})
 
+  // Whether any driver is currently idle — gates the With-Driver option
+  const [driverAvailable, setDriverAvailable] = useState(true)
+  const [checkingDriverAvailability, setCheckingDriverAvailability] = useState(true)
+
+  useEffect(() => {
+    apiFetch('/public/driver-availability')
+      .then(data => setDriverAvailable(!!data.available))
+      .catch(() => setDriverAvailable(true))
+      .finally(() => setCheckingDriverAvailability(false))
+  }, [])
+
+  // If With-Driver becomes unavailable while it's selected, fall back to Self-Drive
+  useEffect(() => {
+    if (!checkingDriverAvailability && !driverAvailable && rentalMode === 'WITH_DRIVER') {
+      setRentalMode('SELF_DRIVE')
+    }
+  }, [checkingDriverAvailability, driverAvailable, rentalMode])
+
   // Fetch active outlets (used across the Home page for city listing)
   useEffect(() => {
     setLoadingOutlets(true)
@@ -317,25 +335,33 @@ export default function Home() {
                   {[
                     { mode: 'WITH_DRIVER', label: 'With-Driver' },
                     { mode: 'SELF_DRIVE', label: 'Self-Drive (Without Driver)' },
-                  ].map(({ mode, label }) => (
-                    <label key={mode} className="flex items-center gap-2" style={{ cursor: 'pointer' }}>
-                      <div
-                        onClick={() => setRentalMode(mode)}
-                        style={{
-                          width: 18, height: 18, borderRadius: '50%',
-                          border: `2px solid ${rentalMode === mode ? 'var(--brand)' : '#ccc'}`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          cursor: 'pointer', flexShrink: 0,
-                        }}
-                      >
-                        {rentalMode === mode && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--brand)' }} />}
-                      </div>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
-                        {label}
-                      </span>
-                    </label>
-                  ))}
+                  ].map(({ mode, label }) => {
+                    const disabled = mode === 'WITH_DRIVER' && !checkingDriverAvailability && !driverAvailable
+                    return (
+                      <label key={mode} className="flex items-center gap-2" style={{ cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.5 : 1 }}>
+                        <div
+                          onClick={() => !disabled && setRentalMode(mode)}
+                          style={{
+                            width: 18, height: 18, borderRadius: '50%',
+                            border: `2px solid ${rentalMode === mode ? 'var(--brand)' : '#ccc'}`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            cursor: disabled ? 'not-allowed' : 'pointer', flexShrink: 0,
+                          }}
+                        >
+                          {rentalMode === mode && <div style={{ width: 9, height: 9, borderRadius: '50%', background: 'var(--brand)' }} />}
+                        </div>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: '#333', userSelect: 'none' }}>
+                          {label}
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
+                {!checkingDriverAvailability && !driverAvailable && (
+                  <p style={{ color: '#dc2626', fontSize: 12, fontWeight: 600, margin: '8px 0 0' }}>
+                    No driver is currently available. With-Driver bookings are temporarily disabled — please choose Self-Drive.
+                  </p>
+                )}
               </div>
             </div>
 
