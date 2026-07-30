@@ -12,6 +12,10 @@ function getVehicleStatusForBookingStatus(status, booking) {
   const now = new Date()
   if (status === 'COMPLETED') return 'AVAILABLE'
   if (status === 'CANCELLED') {
+    // A booking that was never CONFIRMED never had the vehicle handed over
+    // — rejecting a PENDING request always frees the vehicle, regardless of
+    // how its pickup/return window happens to line up with the current time.
+    if (booking.status !== 'CONFIRMED') return 'AVAILABLE'
     const pickup = new Date(booking.pickupDateTime)
     const returnTime = new Date(booking.returnDateTime)
     if (now < pickup || now >= returnTime) return 'AVAILABLE'

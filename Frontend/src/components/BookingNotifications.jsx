@@ -26,13 +26,13 @@ export default function BookingNotifications() {
   useEffect(() => {
     if (!active) return
 
-    // First poll only establishes a baseline (whatever's already pending
-    // when this session starts shouldn't itself trigger a popup) — unless
-    // we already have a stored baseline from a previous session, in which
-    // case we pick up right where we left off and *do* notify about
-    // anything that arrived while this staff member was away.
+    // Pick up from wherever this staff member last left off (persisted per
+    // user), or from 0 on a genuinely fresh session — either way, any
+    // currently-PENDING booking newer than that gets surfaced, including on
+    // the very first poll. A pending request sitting unnoticed is exactly
+    // the case this feature exists for, so first-load should not be silent.
     const stored = localStorage.getItem(storageKey(user.id))
-    lastSeenIdRef.current = stored ? Number(stored) : null
+    lastSeenIdRef.current = stored ? Number(stored) : 0
 
     let cancelled = false
 
@@ -43,15 +43,12 @@ export default function BookingNotifications() {
         if (cancelled || !newBookings.length) return
 
         const maxId = Math.max(...newBookings.map(b => b.id))
-        const isFirstEverPoll = lastSeenIdRef.current === null
         lastSeenIdRef.current = maxId
         localStorage.setItem(storageKey(user.id), String(maxId))
 
-        if (isFirstEverPoll) return // baseline only, don't notify retroactively
-
         showToast(newBookings)
-      } catch {
-        // Silent — a missed poll just gets caught on the next interval.
+      } catch (err) {
+        console.error('Booking notification poll failed:', err.message)
       }
     }
 
