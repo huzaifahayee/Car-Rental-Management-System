@@ -193,6 +193,29 @@ async function createBooking(req, res) {
   }
 }
 
+// Lightweight polling endpoint for the staff new-booking-request popup —
+// returns only PENDING bookings newer than `sinceId`, with minimal fields,
+// so the frontend isn't re-fetching the full booking list every few seconds.
+async function getNewPendingBookings(req, res) {
+  const sinceId = Number(req.query.sinceId) || 0
+  try {
+    const bookings = await req.prisma.booking.findMany({
+      where: { status: 'PENDING', id: { gt: sinceId } },
+      select: {
+        id: true,
+        bookingReference: true,
+        createdAt: true,
+        customer: { select: { fullName: true } },
+        vehiclePackage: { select: { make: true, model: true } },
+      },
+      orderBy: { id: 'asc' },
+    })
+    res.json(bookings)
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch new bookings', details: err.message })
+  }
+}
+
 async function getBookings(req, res) {
   try {
     await reconcileOverdueBookings(req.prisma)
@@ -363,4 +386,4 @@ async function deleteBooking(req, res) {
   }
 }
 
-module.exports = { createBooking, getBookings, updateBookingStatus, cancelBooking, deleteBooking, assignDriver }
+module.exports = { createBooking, getBookings, getNewPendingBookings, updateBookingStatus, cancelBooking, deleteBooking, assignDriver }

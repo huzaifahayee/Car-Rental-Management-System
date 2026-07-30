@@ -30,20 +30,30 @@ async function evictTenantClient(tenantId) {
   try { await client.$disconnect() } catch { /* best-effort */ }
 }
 
+// Whichever tenant is marked isPrimary is the one a bare host (no
+// subdomain, e.g. plain `localhost`) resolves to. This is a slug, not a
+// fixed key — the primary tenant's slug/clientName can be renamed via the
+// Tenants admin UI, and isPrimary survives that rename.
+function primaryTenantSlug() {
+  const tenants = tenantsStore.getAllTenants()
+  const entry = Object.entries(tenants).find(([, t]) => t.isPrimary) || Object.entries(tenants)[0]
+  return entry ? entry[0] : null
+}
+
 // Resolves a tenant slug from the request's Host header. `<slug>.localhost`
 // (dev) or `<slug>.yourdomain.com` (prod) both work the same way: take the
 // first label. A bare host with no subdomain (e.g. `localhost`) resolves to
-// the 'default' tenant.
+// the primary tenant.
 function resolveTenantSlug(hostname) {
-  if (!hostname) return 'default'
+  if (!hostname) return primaryTenantSlug()
   const firstLabel = hostname.split('.')[0]
-  if (!firstLabel || firstLabel === 'localhost' || firstLabel === 'www') return 'default'
+  if (!firstLabel || firstLabel === 'localhost' || firstLabel === 'www') return primaryTenantSlug()
   return firstLabel
 }
 
 function tenantResolver(req, res, next) {
   const slug = resolveTenantSlug(req.hostname)
-  const tenant = tenantsStore.getTenant(slug)
+  const tenant = slug ? tenantsStore.getTenant(slug) : null
 
   if (!tenant) {
     return res.status(404).json({ error: 'No agency found for this address.' })

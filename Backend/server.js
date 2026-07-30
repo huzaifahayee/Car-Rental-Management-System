@@ -12,6 +12,7 @@ const userRoutes = require("./routes/users")
 const publicRoutes = require('./routes/public')
 const tenantRoutes = require('./routes/tenants')
 const { reconcileOverdueBookingsAllTenants } = require('./services/bookingReconciliation')
+const tenantsStore = require('./config/tenantsStore')
 const cors = require("cors")
 
 const app = express()
@@ -46,9 +47,19 @@ app.use('/tenants', tenantRoutes)
 
 async function startServer() {
   try {
-    const prisma = tenantResolver.getPrismaClientForTenant('default')
+    // The "primary" tenant is whichever one is marked isPrimary — not
+    // necessarily keyed 'default' anymore, since its slug/clientName can be
+    // renamed via the Tenants admin UI (isPrimary survives that rename).
+    const tenants = tenantsStore.getAllTenants()
+    const primaryEntry = Object.entries(tenants).find(([, t]) => t.isPrimary) || Object.entries(tenants)[0]
+    if (!primaryEntry) {
+      throw new Error('No tenants configured in tenants.json.')
+    }
+    const [primaryTenantId] = primaryEntry
+
+    const prisma = tenantResolver.getPrismaClientForTenant(primaryTenantId)
     await prisma.$connect()
-    console.log('Connected to PostgreSQL successfully')
+    console.log(`Connected to PostgreSQL successfully (primary tenant: ${primaryTenantId})`)
 
     // Periodically reconcile overdue bookings, across every active tenant,
     // so vehicles are released after their return time.

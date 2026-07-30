@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import apiFetch from '../lib/apiClient'
 import { useAuth } from '../context/AuthContext'
 import LocationAutocomplete from '../components/LocationAutocomplete'
@@ -129,7 +129,16 @@ function buildWhatsAppUrl(phone, message) {
 
 export default function AdminPanel() {
   const { user, loading: authLoading } = useAuth()
-  const [tab, setTab] = useState('overview')
+  const location = useLocation()
+  const [tab, setTab] = useState(location.state?.tab || 'overview')
+
+  // Already on /admin (same route, no remount) when a booking-notification
+  // click fires a new navigation with tab state — the useState initializer
+  // above only covers a fresh mount, so also react to state changes directly.
+  useEffect(() => {
+    if (location.state?.tab) setTab(location.state.tab)
+  }, [location.state])
+
   const [stats, setStats] = useState(null)
   const [bookings, setBookings] = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -1172,36 +1181,36 @@ export default function AdminPanel() {
             )}
 
             {tab === 'tenants' && user.role === 'SUPERADMIN' && (
-              <DataCard
-                title={`Tenants (${tenants.length})`}
-                action={
-                  <button
-                    onClick={openCreateTenantModal}
-                    style={{
-                      background: 'var(--brand)', color: 'var(--surface)', border: 'none',
-                      borderRadius: 8, padding: '8px 16px', fontWeight: 700,
-                      fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    + Create Tenant
-                  </button>
-                }
-              >
-                <p style={{ margin: '0 0 16px', fontSize: 13, color: '#64748b' }}>
-                  You're currently browsing on <strong style={{ color: 'var(--brand-2)' }}>{typeof window !== 'undefined' ? window.location.hostname : ''}</strong>.
-                  This list is the same regardless of which tenant subdomain you're on.
-                </p>
-                {tenantsLoading && <p style={{ color: '#8b95a1', fontSize: 13 }}>Loading tenants…</p>}
-                {tenantsError && <p style={{ color: '#c53030', fontSize: 13 }}>{tenantsError}</p>}
-                {!tenantsLoading && !tenantsError && (
-                  <TenantsTable
-                    tenants={tenants}
-                    onEdit={openEditTenantModal}
-                    onArchive={openArchiveTenantModal}
-                    onUnarchive={handleUnarchiveTenant}
-                  />
-                )}
-              </DataCard>
+              <>
+                <CurrentAgencyCard tenants={tenants} />
+
+                <DataCard
+                  title={`Tenants (${tenants.length})`}
+                  action={
+                    <button
+                      onClick={openCreateTenantModal}
+                      style={{
+                        background: 'var(--brand)', color: 'var(--surface)', border: 'none',
+                        borderRadius: 8, padding: '8px 16px', fontWeight: 700,
+                        fontSize: 13, cursor: 'pointer',
+                      }}
+                    >
+                      + Create Tenant
+                    </button>
+                  }
+                >
+                  {tenantsLoading && <p style={{ color: '#8b95a1', fontSize: 13 }}>Loading tenants…</p>}
+                  {tenantsError && <p style={{ color: '#c53030', fontSize: 13 }}>{tenantsError}</p>}
+                  {!tenantsLoading && !tenantsError && (
+                    <TenantsTable
+                      tenants={tenants}
+                      onEdit={openEditTenantModal}
+                      onArchive={openArchiveTenantModal}
+                      onUnarchive={handleUnarchiveTenant}
+                    />
+                  )}
+                </DataCard>
+              </>
             )}
           </div>
         </div>
@@ -2891,6 +2900,58 @@ function UsersTable({ usersList, currentUser, onRoleChange, onDeleteUser }) {
           )}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+// Resolves which tenant slug the current subdomain maps to, mirroring the
+// backend's resolveTenantSlug (tenantResolver.js) — first hostname label,
+// falling back to 'default' for a bare/plain host.
+function currentTenantSlugFromHostname() {
+  if (typeof window === 'undefined') return 'default'
+  const firstLabel = window.location.hostname.split('.')[0]
+  if (!firstLabel || firstLabel === 'localhost' || firstLabel === 'www') return 'default'
+  return firstLabel
+}
+
+function CurrentAgencyCard({ tenants }) {
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+  const currentSlug = currentTenantSlugFromHostname()
+  const currentTenant = tenants.find(t => t.slug === currentSlug)
+
+  return (
+    <div style={{
+      background: '#fff', borderRadius: 16, padding: 20, marginBottom: 20,
+      border: '1.5px solid rgba(var(--brand-rgb), 0.35)',
+      borderLeft: '5px solid var(--brand)',
+      boxShadow: '0 2px 10px rgba(0,0,0,.04)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap',
+    }}>
+      <div>
+        <p style={{ margin: '0 0 6px', fontSize: 11, fontWeight: 800, color: 'var(--brand-2)', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+          Current Agency
+        </p>
+        {currentTenant ? (
+          <>
+            <h3 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 900, color: '#0f172a' }}>{currentTenant.clientName}</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>{currentTenant.slug}.localhost</p>
+          </>
+        ) : (
+          <>
+            <h3 style={{ margin: '0 0 4px', fontSize: 19, fontWeight: 900, color: '#0f172a' }}>{hostname || 'Unknown'}</h3>
+            <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>Not found in the tenant list below.</p>
+          </>
+        )}
+      </div>
+
+      {currentTenant && <Badge value={currentTenant.status} />}
+
+      <p
+        title="This list is the same regardless of which tenant subdomain you're viewing it from."
+        style={{ width: '100%', margin: '10px 0 0', fontSize: 11, color: '#94a3b8', cursor: 'help' }}
+      >
+        ⓘ The tenant list below doesn't change based on which agency you're currently browsing.
+      </p>
     </div>
   )
 }

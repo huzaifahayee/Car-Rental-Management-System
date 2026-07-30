@@ -155,8 +155,8 @@ async function setTenantStatus(req, res) {
   const tenant = tenants[slug]
   if (!tenant) return res.status(404).json({ error: 'Tenant not found.' })
 
-  if (slug === 'default' && status === 'ARCHIVED') {
-    return res.status(400).json({ error: 'The default tenant cannot be archived.' })
+  if (tenant.isPrimary && status === 'ARCHIVED') {
+    return res.status(400).json({ error: 'The primary tenant cannot be archived.' })
   }
 
   // Server-side enforcement of the "type the tenant name to confirm" flow —

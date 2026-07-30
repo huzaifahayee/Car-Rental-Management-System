@@ -10,6 +10,7 @@
 
 require('dotenv').config()
 const { getPrismaClientForTenant } = require('../middleware/tenantResolver')
+const tenantsStore = require('../config/tenantsStore')
 const { hashPassword } = require('../utils/auth')
 
 async function createAdmin() {
@@ -28,7 +29,13 @@ async function createAdmin() {
     process.exit(1)
   }
 
-  const tenantId = 'default'
+  const tenants = tenantsStore.getAllTenants()
+  const primaryEntry = Object.entries(tenants).find(([, t]) => t.isPrimary) || Object.entries(tenants)[0]
+  if (!primaryEntry) {
+    console.error('No tenants configured in tenants.json.')
+    process.exit(1)
+  }
+  const [tenantId] = primaryEntry
   const prisma = getPrismaClientForTenant(tenantId)
 
   try {

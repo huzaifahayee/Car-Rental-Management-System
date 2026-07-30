@@ -4,6 +4,7 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import apiFetch from '../lib/apiClient'
 import { applyThemeFromName } from '../lib/theme'
+import BookingNotifications from './BookingNotifications'
 
 const PLACEHOLDER_AGENCY_NAME = 'GariTrip Demo Agency'
 const STAFF_ROLES = ['SUPERADMIN', 'ADMIN', 'EMPLOYEE']
@@ -256,6 +257,8 @@ export default function Layout() {
       <main key={location.pathname} className="page-transition">
         <Outlet />
       </main>
+
+      <BookingNotifications />
 
       {showLogoutConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 150, padding: 24 }}>
